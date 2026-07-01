@@ -13,18 +13,32 @@ export default function OutputDisplay({ text, isLoading, onSpeechStateChange }: 
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechUtterance, setSpeechUtterance] = useState<SpeechSynthesisUtterance | null>(null);
 
+  const isSpeechSupported = typeof window !== "undefined" && typeof window.speechSynthesis !== "undefined" && !!window.speechSynthesis;
+
   // Stop reading if component unmounts or text changes
   useEffect(() => {
     return () => {
-      window.speechSynthesis.cancel();
+      if (isSpeechSupported) {
+        try {
+          window.speechSynthesis.cancel();
+        } catch (e) {
+          console.error("Failed to cancel speech synthesis:", e);
+        }
+      }
     };
-  }, []);
+  }, [isSpeechSupported]);
 
   useEffect(() => {
-    window.speechSynthesis.cancel();
+    if (isSpeechSupported) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (e) {
+        console.error("Failed to cancel speech synthesis:", e);
+      }
+    }
     setIsSpeaking(false);
     if (onSpeechStateChange) onSpeechStateChange(false);
-  }, [text]);
+  }, [text, isLoading, isSpeechSupported]);
 
   const handleCopy = async () => {
     try {
@@ -49,8 +63,14 @@ export default function OutputDisplay({ text, isLoading, onSpeechStateChange }: 
   };
 
   const handleSpeech = () => {
+    if (!isSpeechSupported) return;
+
     if (isSpeaking) {
-      window.speechSynthesis.cancel();
+      try {
+        window.speechSynthesis.cancel();
+      } catch (e) {
+        console.error("Failed to cancel speech:", e);
+      }
       setIsSpeaking(false);
       if (onSpeechStateChange) onSpeechStateChange(false);
       return;
@@ -58,37 +78,49 @@ export default function OutputDisplay({ text, isLoading, onSpeechStateChange }: 
 
     if (!text) return;
 
-    // Clean text of markdown characters before speaking for smoother reading
-    const cleanText = text
-      .replace(/[#*`~_]/g, "") // Remove markdown syntax
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1"); // Keep link text, discard urls
+    try {
+      // Cancel previous playback to prevent overlapping
+      window.speechSynthesis.cancel();
 
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    
-    // Attempt to select a deeper, tech-vibe voice if available
-    const voices = window.speechSynthesis.getVoices();
-    const optimalVoice = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Male")));
-    if (optimalVoice) {
-      utterance.voice = optimalVoice;
+      // Clean text of markdown characters before speaking for smoother reading
+      const cleanText = text
+        .replace(/[#*`~_]/g, "") // Remove markdown syntax
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1"); // Keep link text, discard urls
+
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      
+      // Attempt to select a deeper, tech-vibe voice if available
+      const voices = window.speechSynthesis.getVoices();
+      const optimalVoice = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Male")));
+      if (optimalVoice) {
+        utterance.voice = optimalVoice;
+      }
+      
+      utterance.rate = 1.05; // Slightly faster for efficiency
+      utterance.pitch = 0.95; // Slightly lower pitch for Mr. Kilvish's deep authority
+
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        if (onSpeechStateChange) onSpeechStateChange(false);
+      };
+
+      utterance.onerror = (e) => {
+        if (e.error !== "interrupted") {
+          console.error("Speech utterance error:", e);
+        }
+        setIsSpeaking(false);
+        if (onSpeechStateChange) onSpeechStateChange(false);
+      };
+
+      setSpeechUtterance(utterance);
+      window.speechSynthesis.speak(utterance);
+      setIsSpeaking(true);
+      if (onSpeechStateChange) onSpeechStateChange(true);
+    } catch (err) {
+      console.error("Speech synthesis execution error:", err);
+      setIsSpeaking(false);
+      if (onSpeechStateChange) onSpeechStateChange(false);
     }
-    
-    utterance.rate = 1.05; // Slightly faster for efficiency
-    utterance.pitch = 0.95; // Slightly lower pitch for Mr. Kilvish's deep authority
-
-    utterance.onend = () => {
-      setIsSpeaking(false);
-      if (onSpeechStateChange) onSpeechStateChange(false);
-    };
-
-    utterance.onerror = () => {
-      setIsSpeaking(false);
-      if (onSpeechStateChange) onSpeechStateChange(false);
-    };
-
-    setSpeechUtterance(utterance);
-    window.speechSynthesis.speak(utterance);
-    setIsSpeaking(true);
-    if (onSpeechStateChange) onSpeechStateChange(true);
   };
 
   // Render when loading
@@ -149,28 +181,40 @@ export default function OutputDisplay({ text, isLoading, onSpeechStateChange }: 
 
         <div className="flex items-center gap-2">
           {/* Read Aloud Button */}
-          <button
-            type="button"
-            onClick={handleSpeech}
-            className={`p-2 rounded-lg border text-xs font-mono font-semibold flex items-center gap-1.5 transition-all duration-300 ${
-              isSpeaking
-                ? "bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100"
-                : "bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300"
-            }`}
-            title={isSpeaking ? "Stop narrative" : "Narrate with Mr. Kilvish voice"}
-          >
-            {isSpeaking ? (
-              <>
-                <VolumeX className="w-4 h-4 text-indigo-600" />
-                <span>Mute</span>
-              </>
-            ) : (
-              <>
-                <Volume2 className="w-4 h-4 text-blue-600" />
-                <span>Listen</span>
-              </>
-            )}
-          </button>
+          {isSpeechSupported ? (
+            <button
+              type="button"
+              onClick={handleSpeech}
+              className={`p-2 rounded-lg border text-xs font-mono font-semibold flex items-center gap-1.5 transition-all duration-300 cursor-pointer ${
+                isSpeaking
+                  ? "bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100"
+                  : "bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:border-slate-300"
+              }`}
+              title={isSpeaking ? "Stop narrative" : "Narrate with Mr. Kilvish voice"}
+            >
+              {isSpeaking ? (
+                <>
+                  <VolumeX className="w-4 h-4 text-indigo-600" />
+                  <span>Mute</span>
+                </>
+              ) : (
+                <>
+                  <Volume2 className="w-4 h-4 text-blue-600" />
+                  <span>Listen</span>
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="p-2 rounded-lg border border-slate-100 bg-slate-50 text-slate-400 text-xs font-mono font-semibold flex items-center gap-1.5 opacity-60 cursor-not-allowed"
+              title="Speech synthesis is not supported on this browser or environment."
+            >
+              <VolumeX className="w-4 h-4 text-slate-300" />
+              <span>Listen (N/A)</span>
+            </button>
+          )}
 
           {/* Copy Button */}
           <button

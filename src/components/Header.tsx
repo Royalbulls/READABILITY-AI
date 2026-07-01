@@ -1,7 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { Sparkles, Activity, ShieldCheck, ShieldAlert } from "lucide-react";
+import { Sparkles, Activity, ShieldCheck, ShieldAlert, LogIn, LogOut, User } from "lucide-react";
+import { User as FirebaseUser } from "../lib/firebase";
 
-export default function Header() {
+interface HeaderProps {
+  user: FirebaseUser | null;
+  onSignIn: () => void;
+  onSignOut: () => void;
+  isAuthLoading: boolean;
+}
+
+export default function Header({ user, onSignIn, onSignOut, isAuthLoading }: HeaderProps) {
   const [apiKeyOk, setApiKeyOk] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -33,7 +41,7 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Connection & Engine Status */}
+      {/* Connection, Engine, & Auth Status */}
       <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
         {/* Core Status */}
         <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200 text-slate-600">
@@ -55,6 +63,44 @@ export default function Header() {
               <ShieldAlert className="w-3.5 h-3.5 text-amber-500 animate-bounce" />
               <span className="text-slate-600">API: <span className="text-amber-600 font-semibold">MISSING</span></span>
             </>
+          )}
+        </div>
+
+        {/* Authentication Widget */}
+        <div className="flex items-center pl-2 border-l border-slate-200">
+          {isAuthLoading ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 text-slate-500">
+              <span className="w-2.5 h-2.5 rounded-full bg-slate-400 animate-pulse" />
+              <span>Checking account...</span>
+            </div>
+          ) : user ? (
+            <div className="flex items-center gap-3 bg-indigo-50/40 border border-indigo-100 rounded-lg p-1.5 pr-3 text-sans font-sans">
+              <img 
+                src={user.photoURL || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"} 
+                alt={user.displayName || "User"} 
+                className="w-6 h-6 rounded-full object-cover border border-indigo-200" 
+                referrerPolicy="no-referrer"
+              />
+              <div className="hidden sm:flex flex-col text-left">
+                <span className="text-slate-900 font-semibold text-xs leading-none">{user.displayName}</span>
+                <span className="text-[10px] text-indigo-600 leading-none mt-0.5 font-mono">Sync active</span>
+              </div>
+              <button 
+                onClick={onSignOut}
+                className="text-slate-400 hover:text-rose-600 transition p-1 hover:bg-slate-100/80 rounded"
+                title="Sign Out"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={onSignIn}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium hover:shadow-sm transition px-3.5 py-1.5 rounded-lg text-sans font-sans cursor-pointer text-xs"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Sign In with Google</span>
+            </button>
           )}
         </div>
       </div>

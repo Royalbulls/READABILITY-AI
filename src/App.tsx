@@ -4,6 +4,8 @@ import MrKilvishAvatar from "./components/MrKilvishAvatar";
 import ModeSelector from "./components/ModeSelector";
 import ExamplesHistoryPanel from "./components/ExamplesHistoryPanel";
 import OutputDisplay from "./components/OutputDisplay";
+import LocalizedErrorBoundary from "./components/ErrorBoundary";
+import LandingPage from "./components/LandingPage";
 import { InputHistoryItem, SimplificationMode } from "./types";
 import { 
   Upload, 
@@ -19,6 +21,17 @@ import {
   Search,
   Infinity
 } from "lucide-react";
+import { 
+  auth, 
+  googleProvider, 
+  fetchUserHistory, 
+  saveUserHistoryItem, 
+  saveUserHistoryItemsBatch,
+  deleteUserHistoryItem, 
+  clearUserHistory,
+  User
+} from "./lib/firebase";
+import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 
 const TOPIC_SUGGESTIONS = [
   "Quantum Computing",
@@ -30,6 +43,10 @@ const TOPIC_SUGGESTIONS = [
 ];
 
 export default function App() {
+  // Authentication states
+  const [user, setUser] = useState<User | null>(null);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+
   // Input form states
   const [inputTab, setInputTab] = useState<"simplify" | "search">("simplify");
   const [searchTopic, setSearchTopic] = useState("");
@@ -55,25 +72,98 @@ export default function App() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load history from localStorage on mount
+  // Load history from localStorage on mount & sync with Firebase on auth changes
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("readability_ai_history_v2");
-      if (stored) {
-        setHistory(JSON.parse(stored));
+    let unsubscribe = () => {};
+    
+    setIsAuthLoading(true);
+    unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Load local history immediately so the UI is responsive from the start
+      try {
+        const localStored = localStorage.getItem("readability_ai_history_v2");
+        if (localStored) {
+          setHistory(JSON.parse(localStored));
+        } else {
+          setHistory([]);
+        }
+      } catch (e) {
+        console.error("Failed to load local logs:", e);
       }
-    } catch (e) {
-      console.error("Failed to load local logs:", e);
-    }
+
+      if (firebaseUser) {
+        setUser(firebaseUser);
+        setIsAuthLoading(false); // Unblock the UI immediately once user is determined
+
+        // Perform firestore cloud history fetch and synchronization in the background
+        try {
+          const cloudHistory = await fetchUserHistory(firebaseUser.uid);
+          const localStored = localStorage.getItem("readability_ai_history_v2");
+          const localItems: InputHistoryItem[] = localStored ? JSON.parse(localStored) : [];
+          
+          if (localItems.length > 0) {
+            const cloudIds = new Set(cloudHistory.map(item => item.id));
+            const itemsToSync = localItems.filter(item => item && item.id && !cloudIds.has(item.id));
+            
+            if (itemsToSync.length > 0) {
+              const uniqueToSyncMap = new Map<string, InputHistoryItem>();
+              itemsToSync.forEach(item => {
+                uniqueToSyncMap.set(item.id, item);
+              });
+              const uniqueItemsToSync = Array.from(uniqueToSyncMap.values());
+
+              try {
+                await saveUserHistoryItemsBatch(firebaseUser.uid, uniqueItemsToSync);
+              } catch (e) {
+                console.error("Error batch syncing items to firestore:", e);
+              }
+
+              const mergedHistory = await fetchUserHistory(firebaseUser.uid);
+              setHistory(mergedHistory);
+              localStorage.setItem("readability_ai_history_v2", JSON.stringify(mergedHistory));
+            } else {
+              setHistory(cloudHistory);
+              localStorage.setItem("readability_ai_history_v2", JSON.stringify(cloudHistory));
+            }
+          } else {
+            setHistory(cloudHistory);
+            localStorage.setItem("readability_ai_history_v2", JSON.stringify(cloudHistory));
+          }
+        } catch (err) {
+          console.error("Error loading user cloud history:", err);
+        }
+      } else {
+        setUser(null);
+        setIsAuthLoading(false); // Unblock the UI immediately for guests / landing page
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  // Save history to localStorage whenever it changes
-  const saveHistory = (updatedHistory: InputHistoryItem[]) => {
+  // Auth helper methods
+  const handleSignIn = async () => {
+    setIsAuthLoading(true);
+    setError(null);
     try {
-      setHistory(updatedHistory);
-      localStorage.setItem("readability_ai_history_v2", JSON.stringify(updatedHistory));
-    } catch (e) {
-      console.error("Failed to persist logs:", e);
+      await signInWithPopup(auth, googleProvider);
+    } catch (err: any) {
+      console.error("Authentication error:", err);
+      setError("Failed to sign in with Google: " + (err.message || "Unknown error"));
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    setIsAuthLoading(true);
+    setError(null);
+    try {
+      await signOut(auth);
+    } catch (err: any) {
+      console.error("Signout error:", err);
+      setError("Failed to sign out: " + err.message);
+    } finally {
+      setIsAuthLoading(false);
     }
   };
 
@@ -127,11 +217,26 @@ export default function App() {
     setError(null);
   };
 
-  const handleClearHistory = () => {
-    if (confirm("Are you sure you want to clear your saved clarity logs?")) {
-      saveHistory([]);
+  const handleClearHistory = async () => {
+    const confirmMsg = user 
+      ? "Are you sure you want to clear all your saved clarity logs from both Cloud and local storage?"
+      : "Are you sure you want to clear your saved clarity logs from your local workspace?";
+
+    if (confirm(confirmMsg)) {
+      setHistory([]);
+      localStorage.removeItem("readability_ai_history_v2");
+      
+      if (user) {
+        try {
+          await clearUserHistory(user.uid, history);
+        } catch (dbErr: any) {
+          console.error("Firestore clear error:", dbErr);
+          setError("Failed to clear cloud history: " + (dbErr.message || "Unknown error"));
+        }
+      }
     }
   };
+
 
   // Parse attached files
   const processFile = (file: File) => {
@@ -141,23 +246,70 @@ export default function App() {
     const type = file.type;
 
     if (type.startsWith("image/")) {
-      // Image parsing for OCR + simplification via multimodal Gemini
+      // Image parsing for OCR + simplification via multimodal Gemini with client-side scaling/optimization
       const reader = new FileReader();
       reader.onload = (e) => {
-        const base64Data = e.target?.result as string;
-        // Split out the header data:image/png;base64, to get raw base64 data for Gemini SDK
-        const commaIndex = base64Data.indexOf(",");
-        if (commaIndex !== -1) {
-          setImageData(base64Data.substring(commaIndex + 1));
-          setImageMimeType(type);
-          setFileName(file.name);
-          setFileType("image");
-          
-          // Pre-fill a title if empty
-          if (!inputTitle) {
-            setInputTitle(`Image: ${file.name.replace(/\.[^/.]+$/, "")}`);
+        const rawDataUrl = e.target?.result as string;
+        const img = new Image();
+        img.onload = () => {
+          // Target max dimension
+          const MAX_DIM = 1200;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > MAX_DIM || height > MAX_DIM) {
+            if (width > height) {
+              height = Math.round((height * MAX_DIM) / width);
+              width = MAX_DIM;
+            } else {
+              width = Math.round((width * MAX_DIM) / height);
+              height = MAX_DIM;
+            }
           }
-        }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            // Modern browsers automatically handle EXIF orientation when drawing to canvas
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Use image/jpeg for efficient compression, keeping text sharp with 0.85 quality
+            const mimeType = "image/jpeg";
+            const dataUrl = canvas.toDataURL(mimeType, 0.85);
+            
+            const commaIndex = dataUrl.indexOf(",");
+            if (commaIndex !== -1) {
+              setImageData(dataUrl.substring(commaIndex + 1));
+              setImageMimeType(mimeType);
+              setFileName(file.name);
+              setFileType("image");
+              
+              if (!inputTitle) {
+                setInputTitle(`Image: ${file.name.replace(/\.[^/.]+$/, "")}`);
+              }
+            } else {
+              setError("Failed to optimize upload image.");
+            }
+          } else {
+            // Fallback if canvas context is unavailable
+            const commaIndex = rawDataUrl.indexOf(",");
+            if (commaIndex !== -1) {
+              setImageData(rawDataUrl.substring(commaIndex + 1));
+              setImageMimeType(type);
+              setFileName(file.name);
+              setFileType("image");
+              if (!inputTitle) {
+                setInputTitle(`Image: ${file.name.replace(/\.[^/.]+$/, "")}`);
+              }
+            }
+          }
+        };
+        img.onerror = () => {
+          setError("Failed to load image for optimization.");
+        };
+        img.src = rawDataUrl;
       };
       reader.onerror = () => {
         setError("Failed to read image file.");
@@ -325,7 +477,19 @@ export default function App() {
         imageMimeType: (!isSearchMode && imageMimeType) ? imageMimeType : undefined
       };
 
-      saveHistory([logItem, ...history].slice(0, 50)); // Limit to 50 logs for local storage
+      const updatedHistory = [logItem, ...history].slice(0, 50);
+      setHistory(updatedHistory);
+      localStorage.setItem("readability_ai_history_v2", JSON.stringify(updatedHistory));
+
+      if (user) {
+        try {
+          await saveUserHistoryItem(user.uid, logItem);
+        } catch (dbErr: any) {
+          console.error("Firestore save error:", dbErr);
+          setError("Cloud sync delayed: " + (dbErr.message || "Unknown error"));
+        }
+      }
+
       if (!isSearchMode) {
         setInputTitle(finalTitle); // Ensure input title field reflects what was saved
       }
@@ -339,10 +503,35 @@ export default function App() {
     }
   };
 
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-slate-800">
+        <div className="flex flex-col items-center gap-4 animate-pulse">
+          <div className="w-12 h-12 rounded-xl bg-slate-950 flex items-center justify-center text-white font-bold text-2xl font-display shadow-md">
+            K
+          </div>
+          <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-widest text-slate-500">
+            <span className="w-2 h-2 rounded-full bg-indigo-600 animate-ping" />
+            <span>Establishing secure clarity channel...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <LandingPage onSignIn={handleSignIn} isAuthLoading={isAuthLoading} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col selection:bg-slate-200 selection:text-slate-900">
       {/* Branding Header bar */}
-      <Header />
+      <Header 
+        user={user}
+        onSignIn={handleSignIn}
+        onSignOut={handleSignOut}
+        isAuthLoading={isAuthLoading}
+      />
 
       {/* Main Workspace Layout */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -604,13 +793,15 @@ export default function App() {
         <div className="lg:col-span-7 flex flex-col gap-6 h-full">
           
           {/* Main output terminal */}
-          <OutputDisplay 
-            text={output} 
-            isLoading={isLoading} 
-            onSpeechStateChange={(isSpeaking) => {
-              setKilvishStatus(isSpeaking ? "speaking" : "idle");
-            }}
-          />
+          <LocalizedErrorBoundary>
+            <OutputDisplay 
+              text={output} 
+              isLoading={isLoading} 
+              onSpeechStateChange={(isSpeaking) => {
+                setKilvishStatus(isSpeaking ? "speaking" : "idle");
+              }}
+            />
+          </LocalizedErrorBoundary>
 
           {/* Knowledge Insight Card: Simple UI decoration showing the rules in motion */}
           <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5 flex flex-col gap-4">
