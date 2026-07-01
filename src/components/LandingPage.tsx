@@ -21,6 +21,7 @@ import {
   Eye,
   LogIn
 } from "lucide-react";
+import UserSuccessStories from "./UserSuccessStories";
 
 interface LandingPageProps {
   onSignIn: () => void;
@@ -589,101 +590,8 @@ export default function LandingPage({ onSignIn, isAuthLoading }: LandingPageProp
         </div>
       </section>
 
-      {/* SECTION 8: TESTIMONIALS */}
-      <section className="py-20 px-6 bg-white border-b border-slate-100">
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-16 flex flex-col items-center">
-            <span className="text-xs font-mono font-bold text-indigo-600 uppercase tracking-widest">
-              User Satisfaction
-            </span>
-            <h2 className="font-display font-extrabold text-3xl text-slate-950 tracking-tight mt-2">
-              Loved By Readers Everywhere
-            </h2>
-            <p className="text-slate-500 text-sm mt-3 max-w-lg">
-              Hear how Readability AI saves hours of frustration and elevates clarity across diverse use cases.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
-            {/* Testimonial 1 */}
-            <div className="bg-slate-50 border border-slate-150 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="flex gap-1 mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 text-amber-500 fill-amber-500" />
-                  ))}
-                </div>
-                <p className="text-slate-600 text-xs sm:text-sm leading-relaxed italic">
-                  &ldquo;As a law student, reading through dense corporate litigation used to put me to sleep. Readability AI preserves the exact court clauses but translates the Latin jargon. It&apos;s a total game changer.&rdquo;
-                </p>
-              </div>
-              <div className="mt-6 flex items-center gap-3 border-t border-slate-200/60 pt-4">
-                <img 
-                  src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" 
-                  alt="Sarah" 
-                  className="w-9 h-9 rounded-full object-cover border border-slate-200" 
-                />
-                <div>
-                  <h4 className="font-display font-bold text-slate-900 text-xs">Sarah Jenkins</h4>
-                  <span className="text-[10px] text-slate-400 font-mono font-semibold uppercase">Law Student, Columbia</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Testimonial 2 */}
-            <div className="bg-slate-50 border border-slate-150 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="flex gap-1 mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 text-amber-500 fill-amber-500" />
-                  ))}
-                </div>
-                <p className="text-slate-600 text-xs sm:text-sm leading-relaxed italic">
-                  &ldquo;I uploaded my mother&apos;s complex oncology report after her surgery. Being able to read through the results with simple parenthetical medical translations helped us ask the doctor the right questions.&rdquo;
-                </p>
-              </div>
-              <div className="mt-6 flex items-center gap-3 border-t border-slate-200/60 pt-4">
-                <img 
-                  src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80" 
-                  alt="David" 
-                  className="w-9 h-9 rounded-full object-cover border border-slate-200" 
-                />
-                <div>
-                  <h4 className="font-display font-bold text-slate-900 text-xs">David Miller</h4>
-                  <span className="text-[10px] text-slate-400 font-mono font-semibold uppercase">Healthcare Consumer</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Testimonial 3 */}
-            <div className="bg-slate-50 border border-slate-150 rounded-2xl p-6 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="flex gap-1 mb-4">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className="w-4 h-4 text-amber-500 fill-amber-500" />
-                  ))}
-                </div>
-                <p className="text-slate-600 text-xs sm:text-sm leading-relaxed italic">
-                  &ldquo;The Infinity Search engine is my favorite. I searched for complex cryptography details and got back a clean breakdown instantly. Listening to Mr. Kilvish read the audio completes the learning loop.&rdquo;
-                </p>
-              </div>
-              <div className="mt-6 flex items-center gap-3 border-t border-slate-200/60 pt-4">
-                <img 
-                  src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80" 
-                  alt="Elena" 
-                  className="w-9 h-9 rounded-full object-cover border border-slate-200" 
-                />
-                <div>
-                  <h4 className="font-display font-bold text-slate-900 text-xs">Elena Rostova</h4>
-                  <span className="text-[10px] text-slate-400 font-mono font-semibold uppercase">Frontend Architect</span>
-                </div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </section>
+      {/* SECTION 8: DYNAMIC USER SUCCESS STORIES & CALCULATOR */}
+      <UserSuccessStories />
 
       {/* SECTION 9: FAQ */}
       <section className="py-20 px-6 bg-slate-50 border-b border-slate-100">

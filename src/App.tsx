@@ -1,12 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
 import Header from "./components/Header";
+import Sidebar from "./components/Sidebar";
 import MrKilvishAvatar from "./components/MrKilvishAvatar";
 import ModeSelector from "./components/ModeSelector";
 import ExamplesHistoryPanel from "./components/ExamplesHistoryPanel";
 import OutputDisplay from "./components/OutputDisplay";
 import LocalizedErrorBoundary from "./components/ErrorBoundary";
 import LandingPage from "./components/LandingPage";
-import { InputHistoryItem, SimplificationMode } from "./types";
+import PricingWalletView from "./components/PricingWalletView";
+import AdminConsoleView from "./components/AdminConsoleView";
+import GrowthHubView from "./components/GrowthHubView";
+import BusinessStudioView from "./components/BusinessStudioView";
+import AcademyView from "./components/AcademyView";
+import UniversalSearchView from "./components/UniversalSearchView";
+import { InputHistoryItem, SimplificationMode, UserProfile } from "./types";
 import { 
   Upload, 
   X, 
@@ -46,6 +53,8 @@ export default function App() {
   // Authentication states
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [activeView, setActiveView] = useState<"workspace" | "pricing" | "growth" | "admin" | "business" | "academy" | "search">("workspace");
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   // Input form states
   const [inputTab, setInputTab] = useState<"simplify" | "search">("simplify");
@@ -72,6 +81,27 @@ export default function App() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const fetchUserProfile = async (currentUser: User) => {
+    try {
+      const idToken = await currentUser.getIdToken();
+      
+      // Check if referredBy code is in URL
+      const params = new URLSearchParams(window.location.search);
+      const refCode = params.get("ref");
+      const url = refCode ? `/api/user/profile?referredBy=${refCode}` : "/api/user/profile";
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${idToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUserProfile(data);
+      }
+    } catch (err) {
+      console.error("Failed to load user profile:", err);
+    }
+  };
+
   // Load history from localStorage on mount & sync with Firebase on auth changes
   useEffect(() => {
     let unsubscribe = () => {};
@@ -93,6 +123,9 @@ export default function App() {
       if (firebaseUser) {
         setUser(firebaseUser);
         setIsAuthLoading(false); // Unblock the UI immediately once user is determined
+        
+        // Fetch user wallet, credits, and role profile
+        fetchUserProfile(firebaseUser);
 
         // Perform firestore cloud history fetch and synchronization in the background
         try {
@@ -133,6 +166,8 @@ export default function App() {
         }
       } else {
         setUser(null);
+        setUserProfile(null);
+        setActiveView("workspace");
         setIsAuthLoading(false); // Unblock the UI immediately for guests / landing page
       }
     });
@@ -441,11 +476,17 @@ export default function App() {
         }
       }
 
+      const headers: any = {
+        "Content-Type": "application/json",
+      };
+      if (user) {
+        const idToken = await user.getIdToken();
+        headers["Authorization"] = `Bearer ${idToken}`;
+      }
+
       const response = await fetch("/api/simplify", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify(payload),
       });
 
@@ -453,6 +494,11 @@ export default function App() {
 
       if (!response.ok) {
         throw new Error(data.error || "Failed to communicate with intelligence core.");
+      }
+
+      // Refresh user profile states (remaining credits)
+      if (user) {
+        fetchUserProfile(user);
       }
 
       setOutput(data.result);
@@ -524,17 +570,62 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col selection:bg-slate-200 selection:text-slate-900">
-      {/* Branding Header bar */}
-      <Header 
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col lg:flex-row selection:bg-slate-200 selection:text-slate-900">
+      {/* Sidebar navigation */}
+      <Sidebar 
         user={user}
-        onSignIn={handleSignIn}
         onSignOut={handleSignOut}
-        isAuthLoading={isAuthLoading}
+        activeView={activeView}
+        setActiveView={setActiveView}
+        userProfile={userProfile}
       />
 
-      {/* Main Workspace Layout */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* Main Content Pane */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        {/* Main Workspace Layout or Billing or Admin */}
+        {activeView === "pricing" && user ? (
+          <PricingWalletView 
+            user={user}
+            userProfile={userProfile}
+            onRefreshProfile={() => fetchUserProfile(user)}
+          />
+        ) : activeView === "growth" && user ? (
+          <GrowthHubView 
+            user={user}
+            userProfile={userProfile}
+            onRefreshProfile={() => fetchUserProfile(user)}
+          />
+        ) : activeView === "business" && user ? (
+          <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col items-center">
+            <BusinessStudioView
+              user={user}
+              userProfile={userProfile}
+              onRefreshProfile={() => fetchUserProfile(user)}
+              setActiveView={setActiveView}
+            />
+          </div>
+        ) : activeView === "academy" && user ? (
+          <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col items-center">
+            <AcademyView
+              user={user}
+              userProfile={userProfile}
+              onRefreshProfile={() => fetchUserProfile(user)}
+              setActiveView={setActiveView}
+            />
+          </div>
+        ) : activeView === "search" ? (
+          <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col items-center">
+            <UniversalSearchView
+              user={user}
+              userProfile={userProfile}
+              onRefreshProfile={() => fetchUserProfile(user)}
+              setActiveView={setActiveView}
+            />
+          </div>
+        ) : activeView === "admin" && user && userProfile?.role === "admin" ? (
+          <AdminConsoleView user={user} />
+        ) : (
+          <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
         {/* Left Column (Controls & Forms): Width 5 columns on desktop */}
         <div className="lg:col-span-5 flex flex-col gap-6 h-full">
@@ -843,12 +934,14 @@ export default function App() {
           </div>
         </div>
       </main>
+      )}
 
-      {/* Decorative clean footer */}
-      <footer className="border-t border-slate-200 py-6 text-center text-xs font-mono text-slate-400 bg-white mt-auto font-semibold">
-        <p>&copy; {new Date().getFullYear()} READABILITY AI. ALL RIGHTS OF CLARITY PRESERVED.</p>
-        <p className="text-[10px] mt-1 text-slate-400">POWERED BY GEMINI-3.5-FLASH &bull; CORE ENGINE: MR. KILVISH</p>
-      </footer>
+        {/* Decorative clean footer */}
+        <footer className="border-t border-slate-200 py-6 text-center text-xs font-mono text-slate-400 bg-white mt-auto font-semibold">
+          <p>&copy; {new Date().getFullYear()} READABILITY AI. ALL RIGHTS OF CLARITY PRESERVED.</p>
+          <p className="text-[10px] mt-1 text-slate-400">POWERED BY GEMINI-3.5-FLASH &bull; CORE ENGINE: MR. KILVISH</p>
+        </footer>
+      </div>
     </div>
   );
 }

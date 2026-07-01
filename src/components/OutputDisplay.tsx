@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Markdown from "react-markdown";
-import { Copy, Check, Download, Volume2, VolumeX, Sparkles, Shield, Share2 } from "lucide-react";
+import { Copy, Check, Download, Volume2, VolumeX, Sparkles, Shield, Share2, FileText } from "lucide-react";
 
 interface OutputDisplayProps {
   text: string;
@@ -12,6 +12,7 @@ export default function OutputDisplay({ text, isLoading, onSpeechStateChange }: 
   const [copied, setCopied] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechUtterance, setSpeechUtterance] = useState<SpeechSynthesisUtterance | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const isSpeechSupported = typeof window !== "undefined" && typeof window.speechSynthesis !== "undefined" && !!window.speechSynthesis;
 
@@ -22,7 +23,7 @@ export default function OutputDisplay({ text, isLoading, onSpeechStateChange }: 
         try {
           window.speechSynthesis.cancel();
         } catch (e) {
-          console.error("Failed to cancel speech synthesis:", e);
+          console.warn("Speech cancellation check:", e);
         }
       }
     };
@@ -33,7 +34,7 @@ export default function OutputDisplay({ text, isLoading, onSpeechStateChange }: 
       try {
         window.speechSynthesis.cancel();
       } catch (e) {
-        console.error("Failed to cancel speech synthesis:", e);
+        console.warn("Speech reset check:", e);
       }
     }
     setIsSpeaking(false);
@@ -62,18 +63,179 @@ export default function OutputDisplay({ text, isLoading, onSpeechStateChange }: 
     URL.revokeObjectURL(url);
   };
 
+  const handleSavePDF = () => {
+    if (!contentRef.current) return;
+    const contentHtml = contentRef.current.innerHTML;
+
+    const fullHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Readability AI - Simplified Report</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono&display=swap');
+          body {
+            font-family: 'Inter', sans-serif;
+            color: #1e293b;
+            line-height: 1.6;
+            padding: 40px;
+            max-width: 800px;
+            margin: 0 auto;
+          }
+          header {
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+          }
+          .logo-area h1 {
+            font-size: 24px;
+            font-weight: 800;
+            color: #4f46e5;
+            margin: 0;
+            letter-spacing: -0.025em;
+            text-transform: uppercase;
+          }
+          .logo-area p {
+            font-size: 11px;
+            color: #64748b;
+            margin: 4px 0 0 0;
+          }
+          .meta-area {
+            text-align: right;
+            font-size: 11px;
+            color: #64748b;
+            font-family: monospace;
+          }
+          .content-area {
+            font-size: 14px;
+          }
+          .content-area h2 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0f172a;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 8px;
+            margin-top: 24px;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+          }
+          .content-area h3 {
+            font-size: 15px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-top: 18px;
+            margin-bottom: 8px;
+          }
+          .content-area p {
+            margin-top: 0;
+            margin-bottom: 16px;
+            color: #334155;
+          }
+          .content-area ul {
+            list-style-type: disc;
+            padding-left: 20px;
+            margin-bottom: 16px;
+            color: #334155;
+          }
+          .content-area li {
+            margin-bottom: 6px;
+          }
+          .content-area strong {
+            color: #4f46e5;
+            font-weight: 600;
+          }
+          .content-area em {
+            color: #475569;
+            font-style: italic;
+          }
+          .content-area code {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            background-color: #f8fafc;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #0f172a;
+            border: 1px solid #e2e8f0;
+          }
+          footer {
+            margin-top: 50px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 15px;
+            font-size: 10px;
+            color: #94a3b8;
+            text-align: center;
+            font-family: monospace;
+          }
+          @media print {
+            body { padding: 20px; }
+            footer { position: fixed; bottom: 0; left: 0; right: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        <header>
+          <div class="logo-area">
+            <h1>READABILITY AI <span style="font-weight: 400; font-size: 12px; color: #64748b; margin-left: 5px;">v2.5</span></h1>
+            <p>Clarity and simplification report</p>
+          </div>
+          <div class="meta-area">
+            <div>Date: ${new Date().toLocaleDateString()}</div>
+            <div>Engine: Mr. Kilvish Active</div>
+          </div>
+        </header>
+        <div class="content-area">
+          ${contentHtml}
+        </div>
+        <footer>
+          &copy; ${new Date().getFullYear()} READABILITY AI. ALL RIGHTS OF CLARITY PRESERVED.
+        </footer>
+      </body>
+      </html>
+    `;
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(fullHtml);
+      doc.close();
+
+      iframe.contentWindow?.focus();
+      setTimeout(() => {
+        iframe.contentWindow?.print();
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 1000);
+      }, 500);
+    } else {
+      document.body.removeChild(iframe);
+    }
+  };
+
   const handleSpeech = () => {
     if (!isSpeechSupported) return;
 
     if (isSpeaking) {
-      try {
-        window.speechSynthesis.cancel();
-      } catch (e) {
-        console.error("Failed to cancel speech:", e);
-      }
-      setIsSpeaking(false);
-      if (onSpeechStateChange) onSpeechStateChange(false);
-      return;
+       try {
+         window.speechSynthesis.cancel();
+       } catch (e) {
+         console.warn("Speech pause cancellation:", e);
+       }
+       setIsSpeaking(false);
+       if (onSpeechStateChange) onSpeechStateChange(false);
+       return;
     }
 
     if (!text) return;
@@ -106,7 +268,7 @@ export default function OutputDisplay({ text, isLoading, onSpeechStateChange }: 
 
       utterance.onerror = (e) => {
         if (e.error !== "interrupted") {
-          console.error("Speech utterance error:", e);
+          console.warn("Speech utterance event notification:", e.error || e);
         }
         setIsSpeaking(false);
         if (onSpeechStateChange) onSpeechStateChange(false);
@@ -117,7 +279,7 @@ export default function OutputDisplay({ text, isLoading, onSpeechStateChange }: 
       setIsSpeaking(true);
       if (onSpeechStateChange) onSpeechStateChange(true);
     } catch (err) {
-      console.error("Speech synthesis execution error:", err);
+      console.warn("Speech synthesis initial execution notice:", err);
       setIsSpeaking(false);
       if (onSpeechStateChange) onSpeechStateChange(false);
     }
@@ -234,10 +396,21 @@ export default function OutputDisplay({ text, isLoading, onSpeechStateChange }: 
           <button
             type="button"
             onClick={handleDownload}
-            className="p-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300 transition-all duration-300"
+            className="p-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300 transition-all duration-300 cursor-pointer"
             title="Download as Markdown (.md)"
           >
             <Download className="w-4 h-4" />
+          </button>
+
+          {/* Save to PDF Button */}
+          <button
+            type="button"
+            onClick={handleSavePDF}
+            className="p-2 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300 transition-all duration-300 cursor-pointer flex items-center gap-1.5"
+            title="Save as PDF"
+          >
+            <FileText className="w-4 h-4 text-rose-600" />
+            <span className="text-[10px] font-mono font-bold text-slate-500 hidden sm:inline">PDF</span>
           </button>
         </div>
       </div>
@@ -245,7 +418,7 @@ export default function OutputDisplay({ text, isLoading, onSpeechStateChange }: 
       {/* Styled Output Render Container */}
       <div className="p-6 overflow-y-auto max-h-[600px] leading-relaxed font-sans text-slate-800 select-text bg-white">
         {/* Custom CSS overrides on standard Markdown output tags inside .markdown-body */}
-        <div className="markdown-body space-y-5 text-sm font-sans [&_h2]:font-display [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-slate-900 [&_h2]:border-b [&_h2]:border-slate-100 [&_h2]:pb-2 [&_h2]:mt-6 [&_h2]:tracking-wide [&_h2]:uppercase [&_h3]:font-display [&_h3]:text-sm [&_h3]:font-bold [&_h3]:text-slate-800 [&_h3]:mt-4 [&_p]:text-slate-700 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1.5 [&_ul]:text-slate-600 [&_strong]:text-blue-700 [&_strong]:font-semibold [&_em]:text-slate-800 [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-50 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-blue-800 [&_code]:border [&_code]:border-slate-150">
+        <div ref={contentRef} className="markdown-body space-y-5 text-sm font-sans [&_h2]:font-display [&_h2]:text-base [&_h2]:font-bold [&_h2]:text-slate-900 [&_h2]:border-b [&_h2]:border-slate-100 [&_h2]:pb-2 [&_h2]:mt-6 [&_h2]:tracking-wide [&_h2]:uppercase [&_h3]:font-display [&_h3]:text-sm [&_h3]:font-bold [&_h3]:text-slate-800 [&_h3]:mt-4 [&_p]:text-slate-700 [&_p]:leading-relaxed [&_ul]:list-disc [&_ul]:pl-5 [&_ul]:space-y-1.5 [&_ul]:text-slate-600 [&_strong]:text-blue-700 [&_strong]:font-semibold [&_em]:text-slate-800 [&_code]:font-mono [&_code]:text-xs [&_code]:bg-slate-50 [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-blue-800 [&_code]:border [&_code]:border-slate-150">
           <Markdown>{text}</Markdown>
         </div>
       </div>

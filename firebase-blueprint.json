@@ -2,15 +2,27 @@
   "collections": {
     "users": {
       "rules": {
-        "read": "request.auth != null && request.auth.uid == userId",
-        "write": "request.auth != null && request.auth.uid == userId"
+        "read": "request.auth != null && (request.auth.uid == userId || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'))",
+        "write": "request.auth != null && (request.auth.uid == userId || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'))"
       }
     },
     "history": {
       "rules": {
-        "read": "request.auth != null && resource.data.userId == request.auth.uid",
-        "write": "request.auth != null && request.resource.data.userId == request.auth.uid",
-        "delete": "request.auth != null && resource.data.userId == request.auth.uid"
+        "read": "request.auth != null && (resource.data.userId == request.auth.uid || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'))",
+        "write": "request.auth != null && (request.resource.data.userId == request.auth.uid || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'))",
+        "delete": "request.auth != null && (resource.data.userId == request.auth.uid || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'))"
+      }
+    },
+    "transactions": {
+      "rules": {
+        "read": "request.auth != null && (resource.data.userId == request.auth.uid || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'))",
+        "write": "request.auth != null && (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')"
+      }
+    },
+    "admins": {
+      "rules": {
+        "read": "request.auth != null",
+        "write": "false"
       }
     }
   }
