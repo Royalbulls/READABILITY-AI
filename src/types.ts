@@ -50,6 +50,8 @@ export interface UserProfile {
       linkedin?: string;
       github?: string;
       instagram?: string;
+      youtube?: string;
+      facebook?: string;
     };
     location?: string;
     verified?: boolean; // admin controlled
@@ -58,6 +60,13 @@ export interface UserProfile {
     downloadsCount?: number;
     salesCount?: number;
     revenue?: number;
+    brandLogo?: string;
+    brandName?: string;
+    portfolio?: string;
+    email?: string;
+    phone?: string;
+    languages?: string;
+    personalDomain?: string;
   };
 }
 
@@ -101,9 +110,65 @@ export interface TransactionRecord {
   currency: string;
   status: "pending" | "success" | "failed";
   orderId: string;
-  type: "payment" | "referral_bonus" | "manual_adjustment";
+  type: "payment" | "referral_bonus" | "manual_adjustment" | "subscription_renewal" | "refund";
   creditsAllocated: number;
   description: string;
   timestamp: number;
 }
+
+export interface SubscriptionRecord {
+  id: string; // Subscription ID or PayU subscription ID
+  userId: string;
+  planId: "free" | "starter" | "pro" | "creator" | "enterprise";
+  planName: string;
+  amount: number;
+  currency: string;
+  status: "active" | "cancelled" | "pending" | "expired" | "failed";
+  paymentStartDate: number;
+  paymentEndDate: number;
+  nextBillingDate: number;
+  autoRenew: boolean;
+  createdAt: number;
+  updatedAt: number;
+  gateway: "payu";
+  payuSubscriptionId?: string;
+  paymentMethod?: string;
+}
+
+export interface WalletLedgerRecord {
+  id: string;
+  userId: string;
+  type: "credit_renewal" | "credit_purchase" | "usage_deduction" | "referral_bonus" | "refund" | "manual_adjustment";
+  amount: number; // credits changed (positive or negative)
+  previousBalance: number;
+  newBalance: number;
+  description: string;
+  referenceId: string; // invoiceId, transactionId or orderId
+  timestamp: number;
+}
+
+export interface InvoiceRecord {
+  id: string;
+  userId: string;
+  subscriptionId?: string;
+  transactionId?: string;
+  planName: string;
+  amount: number;
+  gstAmount: number; // GST 18% etc
+  totalAmount: number;
+  status: "paid" | "unpaid" | "refunded";
+  billingName: string;
+  billingEmail: string;
+  billingPhone: string;
+  timestamp: number;
+}
+
+export interface WebhookLogRecord {
+  id: string;
+  timestamp: number;
+  payload: any;
+  status: "success" | "failed" | "duplicate";
+  error?: string;
+}
+
 

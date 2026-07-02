@@ -4,6 +4,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import dotenv from "dotenv";
 import fs from "fs";
+import crypto from "crypto";
 import { 
   getOrCreateUserProfile, 
   deductUserCredit, 
@@ -24,7 +25,19 @@ import {
   createCreatorProduct,
   purchaseProductBackend,
   followCreatorBackend,
-  adminUpdateCreatorBackend
+  adminUpdateCreatorBackend,
+  getSubscriptionStatus,
+  createOrUpdateSubscription,
+  cancelSubscription,
+  refundSubscriptionBackend,
+  createWalletLedgerEntry,
+  createInvoice,
+  logWebhook,
+  getSubscriptionList,
+  getInvoiceList,
+  getWalletLedgerList,
+  getWebhookLogs,
+  processPayUSubscriptionSuccess
 } from "./src/lib/serverFirebase.js";
 import { getSimulatedBusinessReport } from "./src/lib/businessSimulator.js";
 
@@ -226,164 +239,504 @@ async function startServer() {
     }
   });
 
-  // API: Create Cashfree Payment Order
-  app.post("/api/payment/create-session", authenticateUser, async (req: any, res) => {
+  // API: Create PayU Subscription Session
+  app.post("/api/payu/create-subscription", authenticateUser, async (req: any, res) => {
+    // Hackathon Feature Flag: Disable real PayU gateway calls during evaluation
+    const DISABLE_PAYMENTS_FOR_HACKATHON = true;
+    if (DISABLE_PAYMENTS_FOR_HACKATHON) {
+      return res.json({
+        success: true,
+        message: "Hackathon Preview Mode: Real gateway integration is bypassed for the prototype evaluation.",
+        isHackathonPreview: true
+      });
+    }
+
     try {
-      const { planId } = req.body;
+      const { planId, phone: requestedPhone } = req.body;
       let amount = 0;
       let credits = 0;
       let planName = "";
 
       if (planId === "starter") {
-        amount = 99;
-        credits = 50;
+        amount = 299;
+        credits = 150;
         planName = "Starter";
       } else if (planId === "pro") {
-        amount = 299;
-        credits = 200;
+        amount = 799;
+        credits = 500;
         planName = "Pro";
-      } else if (planId === "business") {
-        amount = 999;
+      } else if (planId === "creator") {
+        amount = 1499;
         credits = 1000;
-        planName = "Business";
+        planName = "Creator";
+      } else if (planId === "enterprise") {
+        amount = 4999;
+        credits = 5000;
+        planName = "Enterprise";
       } else {
-        return res.status(400).json({ error: "Invalid plan ID." });
+        return res.status(400).json({ error: "Invalid subscription plan ID." });
       }
 
-      const orderId = `order_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-      const isCashfreeConfigured = !!(process.env.CASHFREE_APP_ID && process.env.CASHFREE_SECRET_KEY);
+      const txnid = `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const payuKey = process.env.PAYU_MERCHANT_KEY;
+      const payuSalt = process.env.PAYU_MERCHANT_SALT;
 
-      // Create transaction log in Firestore using admin helper
-      await createPaymentTransaction(orderId, req.user.uid, amount, credits, planName);
+      // Create transaction log in Firestore using admin helper as pending
+      await createPaymentTransaction(txnid, req.user.uid, amount, credits, planName);
 
-      if (!isCashfreeConfigured) {
-        // Cashfree keys are missing, return mock session config
-        console.warn("[Cashfree] Credentials missing. Running in simulated mock mode.");
-        return res.json({
-          order_id: orderId,
-          order_amount: amount,
-          order_currency: "INR",
-          isMock: true,
-          planName,
-          credits,
-          message: "Payment simulation initialized. No real credentials detected."
+      if (!payuKey || !payuSalt) {
+        console.warn("[PayU] Credentials missing in environment.");
+        return res.status(400).json({
+          error: "PayU Merchant Key or Salt environment variable is missing. Please configure them in AI Studio Settings."
         });
       }
 
-      // Real Cashfree API integration
-      const isProd = process.env.CASHFREE_ENVIRONMENT === "production";
-      const cashfreeUrl = isProd 
-        ? "https://api.cashfree.com/pg/orders" 
-        : "https://sandbox.cashfree.com/pg/orders";
+      const isProd = process.env.PAYU_ENVIRONMENT === "production";
+      const payuUrl = isProd 
+        ? "https://secure.payu.in/_payment" 
+        : "https://test.payu.in/_payment";
 
-      const headers = {
-        "x-client-id": process.env.CASHFREE_APP_ID!,
-        "x-client-secret": process.env.CASHFREE_SECRET_KEY!,
-        "x-api-version": "2023-08-01",
-        "Content-Type": "application/json"
-      };
+      const productinfo = `${planName} Subscription - Readability AI`;
+      const firstname = req.user.displayName || "Readability Scholar";
+      const email = req.user.email || "scholar@readability.ai";
+      const phone = requestedPhone || "9999999999";
 
-      const payload = {
-        order_id: orderId,
-        order_amount: amount,
-        order_currency: "INR",
-        customer_details: {
-          customer_id: req.user.uid,
-          customer_name: req.user.displayName || "Readability Customer",
-          customer_email: req.user.email,
-          customer_phone: "9999999999"
-        },
-        order_meta: {
-          return_url: `${process.env.APP_URL || "http://localhost:3000"}/payment-verify?order_id={order_id}`
-        }
-      };
+      const surl = `${process.env.APP_URL || "http://localhost:3000"}/api/payu/callback?status=success&orderId=${txnid}`;
+      const furl = `${process.env.APP_URL || "http://localhost:3000"}/api/payu/callback?status=failed&orderId=${txnid}`;
 
-      const cfRes = await fetch(cashfreeUrl, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload)
+      // Date calculations for SI Details
+      const today = new Date();
+      const pad = (num: number) => String(num).padStart(2, '0');
+      const paymentStartDate = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+      
+      const endDate = new Date();
+      endDate.setFullYear(today.getFullYear() + 2); // 2 years duration
+      const paymentEndDate = `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())}`;
+
+      // Structure of standing instruction as per PayU specifications (enable UPI AutoPay, Card Mandates, eNACH)
+      const siDetails = JSON.stringify({
+        billingAmount: String(amount),
+        billingCurrency: "INR",
+        billingCycle: "MONTHLY",
+        billingInterval: 1,
+        paymentStartDate,
+        paymentEndDate
       });
 
-      if (!cfRes.ok) {
-        const errorText = await cfRes.text();
-        console.error("[Cashfree] Order creation error response:", errorText);
-        throw new Error("Cashfree session initialization failed.");
+      const udf1 = "";
+      const udf2 = "";
+      const udf3 = "";
+      const udf4 = "";
+      const udf5 = "";
+
+      const isSiEnabled = process.env.PAYU_SI_ENABLED === "true";
+      let hashString = "";
+
+      if (isSiEnabled) {
+        // v2 Standing Instructions (SI) hash formula (requires 15 pipes between udf5 and si_details)
+        hashString = `${payuKey}|${txnid}|${amount}|${productinfo}|${firstname}|${email}|${udf1}|${udf2}|${udf3}|${udf4}|${udf5}|||||||||||||||${siDetails}|${payuSalt}`;
+      } else {
+        // v1 Standard Hosted Checkout hash formula
+        hashString = `${payuKey}|${txnid}|${amount}|${productinfo}|${firstname}|${email}|${udf1}|${udf2}|${udf3}|${udf4}|${udf5}||||||${payuSalt}`;
       }
 
-      const cfData = await cfRes.json() as any;
+      const hash = crypto.createHash("sha512").update(hashString, "utf8").digest("hex");
+
+      // Audit Logger for Compliance and Debugging
+      console.log("================================================================================");
+      console.log(`[PayU Transaction Audit Log]`);
+      console.log(`- Time: ${new Date().toISOString()}`);
+      console.log(`- Mode: ${isProd ? "PRODUCTION" : "SANDBOX/TEST"}`);
+      console.log(`- Subscriptions/SI Enabled in Config: ${isSiEnabled ? "YES (Recurring Mandate Mode)" : "NO (Fallback One-Time Mode)"}`);
+      console.log(`- Transaction ID (txnid): ${txnid}`);
+      console.log(`- Plan Name: ${planName}`);
+      console.log(`- Amount: ₹${amount}`);
+      console.log(`- Customer Name: ${firstname}`);
+      console.log(`- Customer Email: ${email}`);
+      console.log(`- PayU Key: ${payuKey.substring(0, 3)}***`);
+      console.log(`- PayU Salt: ${payuSalt.substring(0, 3)}***`);
+      console.log(`- Generated Hash String (Raw): ${hashString}`);
+      console.log(`- SHA512 Calculated Hash: ${hash}`);
+      console.log("================================================================================");
+
+      const responseParams: any = {
+        key: payuKey,
+        txnid,
+        amount: String(amount),
+        productinfo,
+        firstname,
+        email,
+        phone,
+        surl,
+        furl,
+        hash
+      };
+
+      if (isSiEnabled) {
+        responseParams.si = "1";
+        responseParams.si_details = siDetails;
+        responseParams.api_version = "3";
+      }
+
       res.json({
-        order_id: orderId,
-        payment_session_id: cfData.payment_session_id,
-        isMock: false
+        txnid,
+        amount,
+        payuUrl,
+        params: responseParams
       });
 
     } catch (err: any) {
-      console.error("Payment session creation error:", err);
-      res.status(500).json({ error: err.message || "Failed to initiate payment session." });
+      console.error("PayU subscription initiation error:", err);
+      res.status(500).json({ error: err.message || "Failed to initiate subscription session." });
     }
   });
 
-  // API: Verify Cashfree Payment
-  app.post("/api/payment/verify", authenticateUser, async (req: any, res) => {
+  // API: Verify PayU Subscription
+  app.post("/api/payu/verify", authenticateUser, async (req: any, res) => {
     try {
-      const { orderId, simulateSuccess } = req.body;
-      if (!orderId) {
-        return res.status(400).json({ error: "Order ID is required." });
+      const { txnid } = req.body;
+      if (!txnid) {
+        return res.status(400).json({ error: "Transaction ID (txnid) is required." });
       }
 
-      const isCashfreeConfigured = !!(process.env.CASHFREE_APP_ID && process.env.CASHFREE_SECRET_KEY);
-      let isSuccess = false;
+      const txList = await getUserTransactions(req.user.uid);
+      const tx = txList.find((t: any) => t.id === txnid || t.orderId === txnid);
 
-      if (!isCashfreeConfigured || simulateSuccess) {
-        // Handle simulation success path
-        isSuccess = true;
-      } else {
-        // Real Cashfree Verification
-        const isProd = process.env.CASHFREE_ENVIRONMENT === "production";
-        const cashfreeUrl = isProd 
-          ? `https://api.cashfree.com/pg/orders/${orderId}` 
-          : `https://sandbox.cashfree.com/pg/orders/${orderId}`;
+      if (!tx) {
+        return res.status(404).json({ error: "Transaction not found." });
+      }
 
-        const headers = {
-          "x-client-id": process.env.CASHFREE_APP_ID!,
-          "x-client-secret": process.env.CASHFREE_SECRET_KEY!,
-          "x-api-version": "2023-08-01"
-        };
+      let success = tx.status === "success";
+      let status = tx.status;
+      let amount = tx.amount;
+      let credits = tx.creditsAllocated;
 
-        const cfRes = await fetch(cashfreeUrl, { headers });
-        if (cfRes.ok) {
-          const cfData = await cfRes.json() as any;
-          if (cfData.order_status === "PAID") {
-            isSuccess = true;
+      if (!success) {
+        // Call PayU's verify_payment API to reconcile the transaction status securely in real-time
+        const payuKey = process.env.PAYU_MERCHANT_KEY;
+        const payuSalt = process.env.PAYU_MERCHANT_SALT;
+
+        if (payuKey && payuSalt) {
+          try {
+            const hashSequence = `${payuKey}|verify_payment|${txnid}|${payuSalt}`;
+            const hash = crypto.createHash("sha512").update(hashSequence, "utf8").digest("hex");
+
+            const isProd = process.env.PAYU_ENVIRONMENT === "production";
+            const verifyUrl = isProd
+              ? "https://info.payu.in/merchant/postservice.php?form=2"
+              : "https://test.payu.in/merchant/postservice.php?form=2";
+
+            console.log(`[PayU Real-time Reconciliation] Querying PayU verify_payment for txnid: ${txnid}`);
+            const payuRes = await fetch(verifyUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded"
+              },
+              body: new URLSearchParams({
+                key: payuKey,
+                command: "verify_payment",
+                var1: txnid,
+                hash: hash
+              }).toString()
+            });
+
+            if (payuRes.ok) {
+              const resText = await payuRes.text();
+              console.log(`[PayU Real-time Reconciliation] Raw Response for ${txnid}:`, resText);
+              
+              let data: any;
+              try {
+                data = JSON.parse(resText);
+              } catch (e) {
+                console.warn("[PayU Real-time Reconciliation] Failed to parse JSON, attempting string sanitation...");
+                const startIdx = resText.indexOf("{");
+                const endIdx = resText.lastIndexOf("}");
+                if (startIdx !== -1 && endIdx !== -1) {
+                  const cleanedText = resText.substring(startIdx, endIdx + 1);
+                  data = JSON.parse(cleanedText);
+                }
+              }
+
+              if (data && (data.status === 1 || data.status === "1" || data.status === 0 || data.status === "0") && data.transaction_details) {
+                const txDetails = data.transaction_details[txnid];
+                if (txDetails && (txDetails.status === "success" || txDetails.status === "captured")) {
+                  console.log(`[PayU Real-time Reconciliation] Transaction ${txnid} confirmed SUCCESS by PayU. Resolving locally...`);
+                  
+                  // Dynamically activate the subscription in Firestore!
+                  await processPayUSubscriptionSuccess(txnid, txDetails);
+                  
+                  success = true;
+                  status = "success";
+                } else if (txDetails) {
+                  console.log(`[PayU Real-time Reconciliation] Transaction ${txnid} returned state from PayU: ${txDetails.status}`);
+                  status = txDetails.status || status;
+                }
+              }
+            } else {
+              console.warn(`[PayU Real-time Reconciliation] Http error response: ${payuRes.status}`);
+            }
+          } catch (verifyErr) {
+            console.error("[PayU Real-time Reconciliation] Verification process failed:", verifyErr);
           }
         }
       }
 
-      const result = await verifyAndProcessPayment(orderId, isSuccess);
-      return res.json(result);
-
+      res.json({
+        success,
+        status,
+        txnid: tx.id,
+        amount,
+        credits
+      });
     } catch (err: any) {
-      console.error("Payment verification error:", err);
-      res.status(500).json({ error: err.message || "Failed to verify payment." });
+      console.error("PayU verification error:", err);
+      res.status(500).json({ error: "Failed to verify transaction." });
     }
   });
 
-  // API: Cashfree Webhook Verification
-  app.post("/api/payment/webhook", async (req, res) => {
+  // API: PayU Webhook Signature Verification, Replay Prevention & Idempotency
+  app.post("/api/payu/webhook", async (req, res) => {
+    const webhookId = `wh_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     try {
       const payload = req.body;
-      console.log("[Cashfree Webhook] Received payload:", JSON.stringify(payload));
+      console.log("[PayU Webhook] Received payload:", JSON.stringify(payload));
 
-      const orderId = payload?.data?.order?.order_id;
-      const paymentStatus = payload?.data?.payment?.payment_status;
+      const payuKey = process.env.PAYU_MERCHANT_KEY;
+      const payuSalt = process.env.PAYU_MERCHANT_SALT;
 
-      if (orderId && paymentStatus) {
-        await processPaymentWebhook(orderId, paymentStatus);
+      if (!payuKey || !payuSalt) {
+        throw new Error("PayU Merchant Key or Salt missing in environment variables.");
       }
+
+      const {
+        key,
+        txnid,
+        amount,
+        productinfo,
+        firstname,
+        email,
+        status,
+        hash,
+        udf1,
+        udf2,
+        udf3,
+        udf4,
+        udf5
+      } = payload;
+
+      // Reverse hash signature verification: salt|status||||||udf5|udf4|udf3|udf2|udf1|email|firstname|productinfo|amount|txnid|key
+      const udf1Val = udf1 || "";
+      const udf2Val = udf2 || "";
+      const udf3Val = udf3 || "";
+      const udf4Val = udf4 || "";
+      const udf5Val = udf5 || "";
+
+      let expectedHashString = `${payuSalt}|${status}||||||${udf5Val}|${udf4Val}|${udf3Val}|${udf2Val}|${udf1Val}|${email}|${firstname}|${productinfo}|${amount}|${txnid}|${key}`;
+      
+      const additionalCharges = payload.additionalCharges || payload.additional_charges;
+      if (additionalCharges) {
+        expectedHashString = `${additionalCharges}|${expectedHashString}`;
+      }
+
+      const computedHash = crypto.createHash("sha512").update(expectedHashString, "utf8").digest("hex");
+
+      // Verify signature to prevent spoofing & security replay attacks
+      if (computedHash !== hash) {
+        console.warn("[PayU Webhook] Signature mismatch! Security Alert.");
+        // Double check standard hash without additional_charges just in case PayU did not prepend it but passed it
+        const fallbackHash = crypto.createHash("sha512").update(`${payuSalt}|${status}||||||${udf5Val}|${udf4Val}|${udf3Val}|${udf2Val}|${udf1Val}|${email}|${firstname}|${productinfo}|${amount}|${txnid}|${key}`, "utf8").digest("hex");
+        if (fallbackHash !== hash) {
+          await logWebhook({
+            id: webhookId,
+            timestamp: Date.now(),
+            payload,
+            status: "failed",
+            error: `Signature mismatch. Calculated: ${computedHash} (with charges) or ${fallbackHash} (without charges). Got: ${hash}`
+          });
+          return res.status(401).send("Signature verification failed.");
+        }
+      }
+
+      // Check transaction status and process activation dynamically
+      const isSuccess = status === "success" || payload.unmappedstatus === "captured";
+
+      if (isSuccess && txnid) {
+        // Run atomic transaction processor (idempotent, increments wallet and saves ledger/invoice)
+        await processPayUSubscriptionSuccess(txnid, payload);
+        
+        await logWebhook({
+          id: webhookId,
+          timestamp: Date.now(),
+          payload,
+          status: "success"
+        });
+      } else {
+        await logWebhook({
+          id: webhookId,
+          timestamp: Date.now(),
+          payload,
+          status: "failed",
+          error: `Payment status is ${status}`
+        });
+      }
+
       res.status(200).send("OK");
-    } catch (err) {
-      console.error("[Cashfree Webhook] Error:", err);
-      res.status(500).send("Webhook handling failed.");
+    } catch (err: any) {
+      console.error("[PayU Webhook Error]:", err);
+      await logWebhook({
+        id: webhookId,
+        timestamp: Date.now(),
+        payload: req.body,
+        status: "failed",
+        error: err.message || "Webhook processing error"
+      });
+      res.status(500).send("Webhook failure: " + err.message);
+    }
+  });
+
+  // API: Get Subscription Status for Current User
+  app.get("/api/subscription/status", authenticateUser, async (req: any, res) => {
+    try {
+      const subscription = await getSubscriptionStatus(req.user.uid);
+      const profile = await getOrCreateUserProfile(req.user.uid, req.user.email, req.user.displayName);
+      const ledger = await getWalletLedgerList(req.user.uid);
+      const invoices = await getInvoiceList(req.user.uid);
+
+      res.json({
+        subscription,
+        profile,
+        ledger,
+        invoices
+      });
+    } catch (err: any) {
+      console.error("Subscription status load error:", err);
+      res.status(500).json({ error: "Failed to load subscription status details." });
+    }
+  });
+
+  // API: Cancel Subscription (Turn off Auto-Renew)
+  app.post("/api/subscription/cancel", authenticateUser, async (req: any, res) => {
+    try {
+      const sub = await getSubscriptionStatus(req.user.uid);
+      if (!sub) {
+        return res.status(404).json({ error: "No active subscription found to cancel." });
+      }
+
+      await cancelSubscription(sub.id);
+      res.json({ success: true, message: "Subscription cancelled successfully. You will remain on this plan until your next billing cycle." });
+    } catch (err: any) {
+      console.error("Cancel subscription error:", err);
+      res.status(500).json({ error: "Failed to cancel subscription." });
+    }
+  });
+
+  // API: PayU Unified Callback Redirector (GET/POST redirects from PayU)
+  app.post("/api/payu/callback", async (req, res) => {
+    try {
+      const payload = req.body;
+      const txnid = payload.txnid;
+      const status = payload.status;
+      const isSuccess = status === "success" || payload.unmappedstatus === "captured";
+
+      if (isSuccess && txnid) {
+        await processPayUSubscriptionSuccess(txnid, payload);
+      }
+
+      res.send(`
+        <html>
+          <head>
+            <title>Processing Your Subscription...</title>
+            <script>
+              window.location.href = "/?view=pricing&payu_status=${isSuccess ? "success" : "failed"}&order_id=${txnid || ""}";
+            </script>
+          </head>
+          <body style="font-family: sans-serif; text-align: center; margin-top: 100px; background-color: #f8fafc;">
+            <h2>Verifying Your PayU Subscription...</h2>
+            <p>We are processing your payment securely with standard PCI-DSS compliance.</p>
+            <p>Please wait while we redirect you back to Readability AI...</p>
+          </body>
+        </html>
+      `);
+    } catch (err: any) {
+      console.error("PayU POST Callback Error:", err);
+      res.status(500).send("Callback redirection failed.");
+    }
+  });
+
+  app.get("/api/payu/callback", async (req, res) => {
+    try {
+      const txnid = req.query.orderId as string;
+      const status = req.query.status as string;
+      const isSuccess = status === "success";
+
+      res.send(`
+        <html>
+          <head>
+            <title>Processing Your Subscription...</title>
+            <script>
+              window.location.href = "/?view=pricing&payu_status=${isSuccess ? "success" : "failed"}&order_id=${txnid || ""}";
+            </script>
+          </head>
+          <body style="font-family: sans-serif; text-align: center; margin-top: 100px; background-color: #f8fafc;">
+            <h2>Verifying Your PayU Subscription...</h2>
+            <p>Please wait while we redirect you back to Readability AI...</p>
+          </body>
+        </html>
+      `);
+    } catch (err: any) {
+      console.error("PayU GET Callback Error:", err);
+      res.status(500).send("Callback redirection failed.");
+    }
+  });
+
+  // ADMIN API: Get All Webhook Logs
+  app.get("/api/admin/webhooks", authenticateUser, requireAdmin, async (req: any, res) => {
+    try {
+      const logs = await getWebhookLogs();
+      res.json(logs);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to load webhook logs." });
+    }
+  });
+
+  // ADMIN API: Get All Subscriptions
+  app.get("/api/admin/subscriptions", authenticateUser, requireAdmin, async (req: any, res) => {
+    try {
+      const subs = await getSubscriptionList();
+      res.json(subs);
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to load subscriptions list." });
+    }
+  });
+
+  // ADMIN API: Cancel any Subscription
+  app.post("/api/admin/subscriptions/cancel", authenticateUser, requireAdmin, async (req: any, res) => {
+    try {
+      const { subscriptionId } = req.body;
+      if (!subscriptionId) {
+        return res.status(400).json({ error: "Subscription ID is required." });
+      }
+      await cancelSubscription(subscriptionId);
+      res.json({ success: true, message: "Subscription cancelled successfully." });
+    } catch (err: any) {
+      res.status(500).json({ error: "Failed to cancel subscription." });
+    }
+  });
+
+  // ADMIN API: Refund Subscription Payment
+  app.post("/api/admin/subscriptions/refund", authenticateUser, requireAdmin, async (req: any, res) => {
+    try {
+      const { subscriptionId } = req.body;
+      if (!subscriptionId) {
+        return res.status(400).json({ error: "Subscription ID is required." });
+      }
+
+      await refundSubscriptionBackend(subscriptionId);
+
+      res.json({ success: true, message: "Subscription payment refunded and credits revoked successfully." });
+    } catch (err: any) {
+      console.error("Refund subscription error:", err);
+      res.status(500).json({ error: "Failed to refund subscription: " + (err.message || err) });
     }
   });
 
@@ -625,7 +978,20 @@ Ensure your entire output is formatted cleanly in Markdown. Do not include meta-
   // API: Generate Business Studio Report
   app.post("/api/business/generate", authenticateUser, async (req: any, res) => {
     try {
-      const { topic, industry, budget, currency, uploadedText, companyName, stateName, budgetAmount } = req.body;
+      const { 
+        topic, 
+        industry, 
+        budget, 
+        currency, 
+        uploadedText, 
+        companyName, 
+        stateName, 
+        budgetAmount,
+        applicantProfile,
+        businessProfile,
+        projectInformation
+      } = req.body;
+
       if (!topic) {
         return res.status(400).json({ error: "Topic is required" });
       }
@@ -640,7 +1006,7 @@ Ensure your entire output is formatted cleanly in Markdown. Do not include meta-
         const client = getGeminiClient();
         
         const promptText = `
-You are an elite, world-class business consultant, commercial loan underwriter, and regional regulatory specialist.
+You are an elite, world-class business consultant, commercial loan underwriter, Chartered Accountant, and regional regulatory specialist.
 Please generate an ultra-comprehensive, institutional-grade Business and Project Report for a venture with these highly personalized parameters:
 - **Venture Name / Company Name**: "${cleanCompanyName}"
 - **Target State / Region**: "${cleanStateName}"
@@ -649,6 +1015,11 @@ Please generate an ultra-comprehensive, institutional-grade Business and Project
 - **Precise Budget Capital Requirement**: "${currSymbol}${cleanBudgetAmount.toLocaleString("en-IN")}"
 - **Primary Currency**: "${currency}"
 ${uploadedText ? `- **Uploaded Supporting Text Context**: "${uploadedText.substring(0, 5000)}"` : ""}
+
+ADVANCED APPLICANT & BUSINESS PROFILE PARAMETERS (MUST INTEGRATE IN REPORT):
+- **Applicant Personal Profile**: ${JSON.stringify(applicantProfile || {})}
+- **Corporate Entity Profile**: ${JSON.stringify(businessProfile || {})}
+- **Project Operations Details**: ${JSON.stringify(projectInformation || {})}
 
 CRITICAL REQUIREMENTS:
 1. **INPUT PERSONALIZATION**: 
@@ -708,6 +1079,15 @@ The JSON MUST conform strictly to this structure:
     "expenseForecast": "detailed markdown string itemizing feed, rent, marketing, SaaS licenses, energy, and labor costs",
     "breakEvenAnalysis": "detailed markdown string showing exact monthly or client sales thresholds required to achieve break-even (mathematically derived)"
   },
+  "caReview": {
+    "taxSuggestions": "detailed markdown string recommending 3-4 tax planning or deductions under Indian Income Tax Act (e.g. Section 80-IAC, Section 32 depreciation) or global equivalents if global",
+    "gstSuggestions": "detailed markdown string detailing GST thresholds, composition options under Section 10, input tax credit optimization, or global tax equivalents",
+    "complianceReview": "detailed markdown string outlining mandatory compliance dates, ROC filing rules, local labor laws, and environmental certificates",
+    "missingDocuments": ["List of missing checklists like MSME registry, independent quotations, personal bank history, or land NOCs to warn user about bank readiness"],
+    "riskRating": "Low / Medium / High",
+    "bankReadinessScore": 85,
+    "investorReadinessScore": 75
+  },
   "investmentAndFunding": {
     "investmentRequirement": "detailed markdown string listing capital needs for setup, lease, initial inventory, and cash runway",
     "fundingSources": "detailed markdown string illustrating promoter contribution, collateral-free bank debt, or angel funding"
@@ -757,7 +1137,18 @@ The JSON MUST conform strictly to this structure:
       }
 
       if (!generatedReport) {
-        generatedReport = getSimulatedBusinessReport(topic, industry, budget, currency, cleanCompanyName, cleanStateName, cleanBudgetAmount);
+        generatedReport = getSimulatedBusinessReport(
+          topic, 
+          industry, 
+          budget, 
+          currency, 
+          cleanCompanyName, 
+          cleanStateName, 
+          cleanBudgetAmount,
+          applicantProfile,
+          businessProfile,
+          projectInformation
+        );
         console.log("[Server Business Studio] Served high-fidelity simulated report for:", topic);
       }
 

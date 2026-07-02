@@ -42,7 +42,7 @@ export default function Sidebar({
 
   const menuItems = [
     { id: "workspace" as const, label: "Workspace", icon: FileText },
-    { id: "pricing" as const, label: "Buy Credits", icon: CreditCard },
+    { id: "pricing" as const, label: "Subscriptions", icon: CreditCard },
     { id: "growth" as const, label: "Creator Platform", icon: TrendingUp },
     { id: "business" as const, label: "📊 Business Studio", icon: BarChart3 },
     { id: "academy" as const, label: "🎓 Academy 2.0", icon: GraduationCap },

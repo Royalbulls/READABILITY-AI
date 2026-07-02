@@ -45,10 +45,23 @@ import {
   Clock,
   Activity,
   ShoppingBag,
-  Star
+  Star,
+  Building2,
+  Megaphone,
+  GitBranch,
+  BarChart3
 } from "lucide-react";
 import { User as FirebaseUser } from "../lib/firebase";
 import { UserProfile, CreatorProduct } from "../types";
+import { 
+  AIBusinessStudioView, 
+  AIAcademyIntegrationView, 
+  AIMarketingStudioView, 
+  AICRMView, 
+  AIAutomationView, 
+  AIAnalyticsView, 
+  EnterpriseSettingsView 
+} from "./CreatorOSAddons";
 
 interface GrowthHubViewProps {
   user: FirebaseUser;
@@ -59,7 +72,8 @@ interface GrowthHubViewProps {
 export default function GrowthHubView({ user, userProfile, onRefreshProfile }: GrowthHubViewProps) {
   // Navigation tabs in Creator Hub
   const [activeTab, setActiveTab] = useState<
-    "dashboard" | "profile" | "creator" | "marketplace" | "launch" | "earnings" | "referrals" | "admin"
+    "dashboard" | "profile" | "creator" | "marketplace" | "launch" | "earnings" | "referrals" | "admin" |
+    "business-studio" | "academy-integration" | "marketing-studio" | "crm" | "automation" | "analytics" | "enterprise-settings"
   >("dashboard");
 
   // General States
@@ -171,6 +185,34 @@ export default function GrowthHubView({ user, userProfile, onRefreshProfile }: G
     navigator.clipboard.writeText(text);
     setCopiedText(label);
     setTimeout(() => setCopiedText(null), 2500);
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, type: "avatar" | "banner" | "logo") => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      setErrorMsg("File is too large! Please upload an image smaller than 2MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      if (type === "avatar") {
+        setProfilePhoto(base64String);
+      } else if (type === "banner") {
+        setCoverBanner(base64String);
+      } else if (type === "logo") {
+        setBrandLogo(base64String);
+      }
+      setSuccessMsg(`${type === "avatar" ? "Avatar" : type === "banner" ? "Banner" : "Brand Logo"} updated successfully with local image file upload!`);
+      setTimeout(() => setSuccessMsg(""), 4000);
+    };
+    reader.onerror = () => {
+      setErrorMsg("Error reading image file.");
+    };
+    reader.readAsDataURL(file);
   };
 
   // Module 1: Handle Profile Save
@@ -579,52 +621,69 @@ export default function GrowthHubView({ user, userProfile, onRefreshProfile }: G
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 font-sans pb-24">
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-950/40 via-slate-900 to-slate-950 text-slate-100 font-sans pb-24 relative overflow-hidden">
+      {/* Decorative background light leaks */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-1/3 right-10 w-80 h-80 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+      
       {/* Module 13 UI Header */}
-      <div className="bg-slate-950 border-b border-slate-800 py-6 px-6 sm:px-8">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-slate-950/80 backdrop-blur-md border-b border-slate-800/80 py-6 px-6 sm:px-8 relative z-10 sticky top-0 shadow-lg">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="bg-indigo-600 text-white text-[10px] font-mono font-bold uppercase px-2 py-0.5 rounded-full tracking-widest">
-                LAUNCH ECONOMY v3.0
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-[9px] font-mono font-extrabold uppercase px-2.5 py-1 rounded-full tracking-widest shadow-sm">
+                CREATOR PORTAL v3.0
+              </span>
+              <span className="bg-amber-500/20 border border-amber-500/30 text-amber-200 text-[9px] font-mono font-extrabold uppercase px-2.5 py-1 rounded-full tracking-widest shadow-sm flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-amber-400" /> Prototype Preview
               </span>
               {userProfile?.creatorApproved && (
-                <span className="bg-emerald-950 border border-emerald-800 text-emerald-400 text-[10px] font-mono uppercase px-2 py-0.5 rounded-full flex items-center gap-1 font-bold">
-                  <Shield className="w-2.5 h-2.5" /> Approved Creator
+                <span className="bg-emerald-950/80 border border-emerald-500/30 text-emerald-400 text-[9px] font-mono uppercase px-2.5 py-1 rounded-full flex items-center gap-1 font-bold shadow-sm">
+                  <Shield className="w-3 h-3 text-emerald-400" /> Approved Expert Creator
                 </span>
               )}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-display font-black tracking-tight mt-1 flex items-center gap-2 text-white">
-              Creator Economy Platform
+            <h1 className="text-2xl sm:text-3xl font-display font-black tracking-tight mt-2 flex items-center gap-2 text-white">
+              Creator Economy Console
             </h1>
-            <p className="text-slate-400 text-xs sm:text-sm mt-0.5 font-medium tracking-wide">
-              Create • Learn • Publish • Launch • Grow • Earn
+            <p className="text-slate-400 text-xs sm:text-sm mt-1 font-medium tracking-wide flex items-center gap-1">
+              <span>Create</span>
+              <span className="text-indigo-500">•</span>
+              <span>Learn</span>
+              <span className="text-indigo-500">•</span>
+              <span>Publish</span>
+              <span className="text-indigo-500">•</span>
+              <span>Launch</span>
+              <span className="text-indigo-500">•</span>
+              <span>Grow</span>
+              <span className="text-indigo-500">•</span>
+              <span>Earn</span>
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             {/* Wallet Stat */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                <Coins className="w-4.5 h-4.5" />
+            <div className="bg-slate-900/90 border border-slate-800/80 hover:border-slate-700/80 rounded-2xl p-3 flex items-center gap-3 transition-all duration-300 shadow-md">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500/10 to-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-inner">
+                <Coins className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-[9px] font-mono text-slate-400 uppercase font-bold block">Wallet Balance</span>
-                <span className="text-sm font-mono font-extrabold text-white">
-                  {walletBalance.toLocaleString()} <span className="text-emerald-400 text-xs">Cr</span>
+                <span className="text-[9px] font-mono text-slate-400 uppercase font-bold block tracking-wider">Wallet Balance</span>
+                <span className="text-sm font-mono font-extrabold text-white flex items-baseline gap-1">
+                  {walletBalance.toLocaleString()} <span className="text-emerald-400 text-xs font-semibold">Cr</span>
                 </span>
               </div>
             </div>
 
             {/* Referrals Stat */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400">
-                <Share2 className="w-4.5 h-4.5" />
+            <div className="bg-slate-900/90 border border-slate-800/80 hover:border-slate-700/80 rounded-2xl p-3 flex items-center gap-3 transition-all duration-300 shadow-md">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500/10 to-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-inner">
+                <Share2 className="w-5 h-5" />
               </div>
               <div>
-                <span className="text-[9px] font-mono text-slate-400 uppercase font-bold block">Referral Earned</span>
-                <span className="text-sm font-mono font-extrabold text-white">
-                  {referralEarnings} <span className="text-indigo-400 text-xs">Cr</span>
+                <span className="text-[9px] font-mono text-slate-400 uppercase font-bold block tracking-wider">Referral Earned</span>
+                <span className="text-sm font-mono font-extrabold text-white flex items-baseline gap-1">
+                  {referralEarnings} <span className="text-indigo-400 text-xs font-semibold">Cr</span>
                 </span>
               </div>
             </div>
@@ -632,63 +691,175 @@ export default function GrowthHubView({ user, userProfile, onRefreshProfile }: G
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start relative z-10">
         
         {/* Navigation Sidebar Drawer */}
-        <aside className="lg:col-span-3 bg-slate-950 border border-slate-800 rounded-3xl p-4 space-y-1.5 shadow-xl">
-          <div className="px-3 py-2 text-[10px] font-mono font-bold text-slate-500 uppercase tracking-wider">
-            CREATOR CORE PLATFORM
-          </div>
+        <aside className="lg:col-span-3 bg-slate-950/80 backdrop-blur-md border border-slate-800/80 rounded-3xl p-4 space-y-4 shadow-2xl max-h-[85vh] overflow-y-auto scrollbar-thin">
           
-          {[
-            { id: "dashboard", label: "Creator Dashboard", icon: TrendingUp },
-            { id: "profile", label: "Creator Profile", icon: User },
-            { id: "creator", label: "AI Content Creator", icon: Sparkles },
-            { id: "marketplace", label: "Marketplace Catalog", icon: Compass },
-            { id: "launch", label: "Launch & Promos", icon: Award },
-            { id: "earnings", label: "Earnings & Wallet", icon: DollarSign },
-            { id: "referrals", label: "Referral Program", icon: Share2 },
-            ...(isAdmin ? [{ id: "admin", label: "Admin Moderate", icon: Shield }] : [])
-          ].map(tab => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            const locked = isTabLocked(tab.id);
-            return (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id as any);
-                  setSuccessMsg("");
-                  setErrorMsg("");
-                }}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-mono font-bold transition duration-200 cursor-pointer ${
-                  isActive 
-                    ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/10" 
-                    : "text-slate-400 hover:bg-slate-900 hover:text-white"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Icon className={`w-4 h-4 ${isActive ? "text-white" : "text-slate-500"}`} />
-                  <span>{tab.label}</span>
-                </div>
-                {locked && (
-                  <Lock className={`w-3.5 h-3.5 ${isActive ? "text-white animate-pulse" : "text-slate-600"}`} />
-                )}
-              </button>
-            );
-          })}
+          {/* Section 1: Core Workspace */}
+          <div className="space-y-1">
+            <div className="px-3 py-1 text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest border-b border-slate-900 mb-2">
+              Workspace Core
+            </div>
+            {[
+              { id: "dashboard", label: "Creator Dashboard", icon: TrendingUp },
+              { id: "profile", label: "Creator Profile", icon: User },
+              { id: "creator", label: "AI Content Creator", icon: Sparkles },
+              { id: "marketplace", label: "Marketplace Catalog", icon: Compass }
+            ].map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id as any);
+                    setSuccessMsg("");
+                    setErrorMsg("");
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-mono font-bold transition-all duration-200 cursor-pointer group relative ${
+                    isActive 
+                      ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/10 border border-indigo-500/40" 
+                      : "text-slate-400 hover:bg-slate-900/40 hover:text-white border border-transparent"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Icon className={`w-3.5 h-3.5 transition-transform duration-200 group-hover:scale-110 ${isActive ? "text-white" : "text-slate-500 group-hover:text-indigo-400"}`} />
+                    <span className="tracking-wide">{tab.label}</span>
+                  </div>
+                  <ChevronRight className={`w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${isActive ? "text-white/80" : "text-slate-500"}`} />
+                </button>
+              );
+            })}
+          </div>
 
-          <div className="pt-4 border-t border-slate-800 mt-4 px-3">
-            <div className="bg-slate-900/60 border border-slate-850 rounded-2xl p-3 text-center">
-              <span className="text-[9px] font-mono text-indigo-400 block font-bold tracking-wider uppercase">Your Creator Journey</span>
-              <span className="text-xs font-extrabold text-white mt-1 block">{levelName.split(":")[1]}</span>
-              <div className="w-full bg-slate-950 h-1.5 rounded-full mt-2 overflow-hidden border border-slate-850">
+          {/* Section 2: Financials & Growth */}
+          <div className="space-y-1">
+            <div className="px-3 py-1 text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest border-b border-slate-900 mb-2">
+              Financials & Growth
+            </div>
+            {[
+              { id: "launch", label: "Launch & Promos", icon: Award },
+              { id: "earnings", label: "Earnings & Wallet", icon: DollarSign },
+              { id: "referrals", label: "Referral Program", icon: Share2 }
+            ].map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id as any);
+                    setSuccessMsg("");
+                    setErrorMsg("");
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-mono font-bold transition-all duration-200 cursor-pointer group relative ${
+                    isActive 
+                      ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/10 border border-indigo-500/40" 
+                      : "text-slate-400 hover:bg-slate-900/40 hover:text-white border border-transparent"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Icon className={`w-3.5 h-3.5 transition-transform duration-200 group-hover:scale-110 ${isActive ? "text-white" : "text-slate-500 group-hover:text-indigo-400"}`} />
+                    <span className="tracking-wide">{tab.label}</span>
+                  </div>
+                  <ChevronRight className={`w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${isActive ? "text-white/80" : "text-slate-500"}`} />
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Section 3: AI Enterprise Systems */}
+          <div className="space-y-1">
+            <div className="px-3 py-1 text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest border-b border-slate-900 mb-2">
+              AI Enterprise Systems
+            </div>
+            {[
+              { id: "business-studio", label: "AI Business Studio", icon: Building2 },
+              { id: "academy-integration", label: "AI Academy Sync", icon: BookOpen },
+              { id: "marketing-studio", label: "AI Marketing Studio", icon: Megaphone },
+              { id: "crm", label: "AI CRM Pipeline", icon: Users },
+              { id: "automation", label: "AI Automation", icon: GitBranch },
+              { id: "analytics", label: "AI BI Analytics", icon: BarChart3 }
+            ].map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id as any);
+                    setSuccessMsg("");
+                    setErrorMsg("");
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-mono font-bold transition-all duration-200 cursor-pointer group relative ${
+                    isActive 
+                      ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/10 border border-indigo-500/40" 
+                      : "text-slate-400 hover:bg-slate-900/40 hover:text-white border border-transparent"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Icon className={`w-3.5 h-3.5 transition-transform duration-200 group-hover:scale-110 ${isActive ? "text-white" : "text-slate-500 group-hover:text-indigo-400"}`} />
+                    <span className="tracking-wide">{tab.label}</span>
+                  </div>
+                  <ChevronRight className={`w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${isActive ? "text-white/80" : "text-slate-500"}`} />
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Section 4: Administration & Scale */}
+          <div className="space-y-1">
+            <div className="px-3 py-1 text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest border-b border-slate-900 mb-2">
+              Administration & Scale
+            </div>
+            {[
+              ...(isAdmin ? [{ id: "admin", label: "Admin Moderate", icon: Shield }] : []),
+              { id: "enterprise-settings", label: "Enterprise Settings", icon: Settings }
+            ].map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id as any);
+                    setSuccessMsg("");
+                    setErrorMsg("");
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-mono font-bold transition-all duration-200 cursor-pointer group relative ${
+                    isActive 
+                      ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/10 border border-indigo-500/40" 
+                      : "text-slate-400 hover:bg-slate-900/40 hover:text-white border border-transparent"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Icon className={`w-3.5 h-3.5 transition-transform duration-200 group-hover:scale-110 ${isActive ? "text-white" : "text-slate-500 group-hover:text-indigo-400"}`} />
+                    <span className="tracking-wide">{tab.label}</span>
+                  </div>
+                  <ChevronRight className={`w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${isActive ? "text-white/80" : "text-slate-500"}`} />
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="pt-4 border-t border-slate-900 mt-4 px-3">
+            <div className="bg-gradient-to-b from-slate-900/80 to-slate-950/80 border border-slate-800/60 rounded-2xl p-4 text-center relative overflow-hidden shadow-inner">
+              <span className="text-[9px] font-mono text-indigo-400 block font-bold tracking-widest uppercase">Your Creator Journey</span>
+              <span className="text-xs font-extrabold text-white mt-1.5 block">{levelName.split(":")[1]}</span>
+              
+              <div className="w-full bg-slate-950 h-2.5 rounded-full mt-3 overflow-hidden border border-slate-900/80 relative">
                 <div 
-                  className="bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 h-full transition-all duration-500" 
+                  className="bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 h-full transition-all duration-700 shadow-glow" 
                   style={{ width: `${levelProgressPercent}%` }}
                 />
               </div>
-              <span className="text-[9px] font-mono text-slate-400 block mt-1.5 leading-tight">{levelDescription}</span>
+              
+              <div className="flex justify-between items-center mt-2">
+                <span className="text-[9px] font-mono text-slate-500 font-bold uppercase">Progress</span>
+                <span className="text-[9px] font-mono text-indigo-400 font-extrabold">{levelProgressPercent}%</span>
+              </div>
+              <span className="text-[9px] font-mono text-slate-400 block mt-3 leading-relaxed text-center px-1 border-t border-slate-900/60 pt-2.5">{levelDescription}</span>
             </div>
           </div>
         </aside>
@@ -1026,33 +1197,140 @@ export default function GrowthHubView({ user, userProfile, onRefreshProfile }: G
                       🎨 Visual Identity Assets
                     </h4>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <label className="text-xs font-mono font-bold text-slate-400 block mb-1">Avatar Photo URL</label>
-                        <input
-                          type="text"
-                          value={profilePhoto}
-                          onChange={(e) => setProfilePhoto(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
-                        />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {/* Avatar Card */}
+                      <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between space-y-3">
+                        <div>
+                          <label className="text-xs font-mono font-bold text-slate-400 block mb-1">Avatar Photo</label>
+                          <p className="text-[10px] text-slate-500 mb-2 leading-relaxed">Upload square profile avatar or paste an image URL.</p>
+                          
+                          {/* Image Preview */}
+                          <div className="flex items-center gap-3 mb-3 bg-slate-950 p-2.5 rounded-xl border border-slate-900">
+                            <img 
+                              src={profilePhoto} 
+                              alt="Avatar Preview" 
+                              className="w-12 h-12 rounded-full object-cover border border-slate-800" 
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80";
+                              }}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <span className="text-[10px] font-mono text-slate-400 block font-bold truncate">Avatar Status</span>
+                              <span className="text-[9px] font-mono text-emerald-400 font-bold block flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live Preview
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/30 hover:border-indigo-500/50 rounded-xl text-indigo-400 hover:text-indigo-300 font-mono text-[10px] font-extrabold uppercase transition cursor-pointer text-center">
+                            <Upload className="w-3.5 h-3.5 animate-bounce" /> Upload Photo
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              onChange={(e) => handlePhotoUpload(e, "avatar")}
+                              className="hidden" 
+                            />
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={profilePhoto}
+                              onChange={(e) => setProfilePhoto(e.target.value)}
+                              placeholder="Or paste direct image link..."
+                              className="w-full bg-slate-950 border border-slate-800/80 rounded-lg px-2.5 py-1.5 text-[10px] font-mono text-slate-300 focus:outline-none focus:border-indigo-500/50 placeholder:text-slate-700"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <label className="text-xs font-mono font-bold text-slate-400 block mb-1">Cover Banner URL</label>
-                        <input
-                          type="text"
-                          value={coverBanner}
-                          onChange={(e) => setCoverBanner(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
-                        />
+
+                      {/* Cover Banner Card */}
+                      <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between space-y-3">
+                        <div>
+                          <label className="text-xs font-mono font-bold text-slate-400 block mb-1">Cover Banner</label>
+                          <p className="text-[10px] text-slate-500 mb-2 leading-relaxed">Upload banner image or paste an image URL.</p>
+                          
+                          {/* Image Preview */}
+                          <div className="mb-3 bg-slate-950 p-2 rounded-xl border border-slate-900">
+                            <img 
+                              src={coverBanner} 
+                              alt="Cover Banner Preview" 
+                              className="w-full h-12 rounded-lg object-cover border border-slate-800" 
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=800&auto=format&fit=crop&q=80";
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/30 hover:border-indigo-500/50 rounded-xl text-indigo-400 hover:text-indigo-300 font-mono text-[10px] font-extrabold uppercase transition cursor-pointer text-center">
+                            <Upload className="w-3.5 h-3.5 animate-bounce" /> Upload Banner
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              onChange={(e) => handlePhotoUpload(e, "banner")}
+                              className="hidden" 
+                            />
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={coverBanner}
+                              onChange={(e) => setCoverBanner(e.target.value)}
+                              placeholder="Or paste direct image link..."
+                              className="w-full bg-slate-950 border border-slate-800/80 rounded-lg px-2.5 py-1.5 text-[10px] font-mono text-slate-300 focus:outline-none focus:border-indigo-500/50 placeholder:text-slate-700"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <label className="text-xs font-mono font-bold text-slate-400 block mb-1">Brand Logo URL</label>
-                        <input
-                          type="text"
-                          value={brandLogo}
-                          onChange={(e) => setBrandLogo(e.target.value)}
-                          className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
-                        />
+
+                      {/* Brand Logo Card */}
+                      <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between space-y-3">
+                        <div>
+                          <label className="text-xs font-mono font-bold text-slate-400 block mb-1">Brand Logo</label>
+                          <p className="text-[10px] text-slate-500 mb-2 leading-relaxed">Upload brand square logo or paste an image URL.</p>
+                          
+                          {/* Image Preview */}
+                          <div className="flex items-center gap-3 mb-3 bg-slate-950 p-2.5 rounded-xl border border-slate-900">
+                            <img 
+                              src={brandLogo} 
+                              alt="Brand Logo Preview" 
+                              className="w-12 h-12 rounded-lg object-cover border border-slate-800" 
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=80&auto=format&fit=crop&q=80";
+                              }}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <span className="text-[10px] font-mono text-slate-400 block font-bold truncate">Logo Status</span>
+                              <span className="text-[9px] font-mono text-emerald-400 font-bold block flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live Preview
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/30 hover:border-indigo-500/50 rounded-xl text-indigo-400 hover:text-indigo-300 font-mono text-[10px] font-extrabold uppercase transition cursor-pointer text-center">
+                            <Upload className="w-3.5 h-3.5 animate-bounce" /> Upload Logo
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              onChange={(e) => handlePhotoUpload(e, "logo")}
+                              className="hidden" 
+                            />
+                          </label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={brandLogo}
+                              onChange={(e) => setBrandLogo(e.target.value)}
+                              placeholder="Or paste direct image link..."
+                              className="w-full bg-slate-950 border border-slate-800/80 rounded-lg px-2.5 py-1.5 text-[10px] font-mono text-slate-300 focus:outline-none focus:border-indigo-500/50 placeholder:text-slate-700"
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2029,87 +2307,316 @@ export default function GrowthHubView({ user, userProfile, onRefreshProfile }: G
 
           {/* TAB 7: REFERRAL ENGINE PROGRAM */}
           {activeTab === "referrals" && (
-            <div className="space-y-6 animate-fade-in">
-              <div className="bg-slate-950 border border-slate-800 rounded-3xl p-6 sm:p-8 space-y-6">
-                <div>
-                  <span className="text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-widest flex items-center gap-1.5">
-                    <Share2 className="w-3.5 h-3.5" /> REVENUE & REF REGISTRATION SYSTEM (MODULE 7)
-                  </span>
-                  <h3 className="font-display font-black text-lg text-white mt-1">
-                    Double Your Credits On Referral Actions
-                  </h3>
-                  <p className="text-slate-400 text-xs mt-1">
-                    When you invite scholars, educators, or researchers, they receive <strong className="text-white font-semibold">15 free credits</strong>, and you receive <strong className="text-emerald-400 font-bold">15 credits</strong> on their first valid document simplification.
-                  </p>
+            <div className="space-y-6 animate-fade-in relative">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+              
+              <div className="bg-slate-950/95 border border-slate-800/80 rounded-3xl p-6 sm:p-8 space-y-8 shadow-2xl relative overflow-hidden">
+                {/* Header Section */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-900">
+                  <div className="space-y-1">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-[10px] font-mono font-black uppercase tracking-widest">
+                      <Share2 className="w-3.5 h-3.5" /> REVENUE & REF REGISTRATION SYSTEM (MODULE 7)
+                    </span>
+                    <h3 className="font-display font-black text-2xl text-white mt-3">
+                      Double Your Cognitive Dividends
+                    </h3>
+                    <p className="text-slate-400 text-xs sm:text-sm max-w-2xl leading-relaxed">
+                      Invite scholars, educators, or researchers to the Readability-AI workspace. They receive <strong className="text-white font-bold">15 free credits</strong> instantly, and you earn <strong className="text-emerald-400 font-extrabold">15 credits</strong> plus <strong className="text-indigo-400 font-extrabold">10% royalties</strong> on all products they sell!
+                    </p>
+                  </div>
+                  
+                  {/* Dynamic stats snippet */}
+                  <div className="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-center text-center md:min-w-[160px] shadow-inner">
+                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-widest font-extrabold block">Your Referrals</span>
+                    <span className="text-3xl font-mono font-black text-white mt-1">
+                      {userProfile?.referralsCount || 0}
+                    </span>
+                    <span className="text-[10px] font-mono text-indigo-400 mt-1 block">Active Scholars</span>
+                  </div>
                 </div>
 
-                {/* Referral Coupon Action */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
-                    <span className="text-[9px] font-mono text-slate-400 uppercase font-bold block">YOUR ACTIVE REFERRAL COUPON</span>
-                    <div className="bg-slate-950 border border-slate-850 p-4 rounded-xl flex items-center justify-between border-dashed border-indigo-500/20">
-                      <span className="font-mono font-black text-lg text-white tracking-widest select-all">
-                        {userProfile?.referralCode || "READ-MEMBER-X"}
-                      </span>
-                      <button
-                        onClick={() => copyToClipboard(userProfile?.referralCode || "READ-MEMBER-X", "referral_code")}
-                        className="p-2 bg-slate-900 hover:bg-slate-850 rounded-lg text-slate-400 hover:text-white transition cursor-pointer"
-                        title="Copy Referral Code"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </button>
+                {/* Viral Referral Roadmap & Double-Sided Reward Indicator */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Step 1 */}
+                  <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 relative group hover:border-slate-700/80 transition-all duration-300">
+                    <div className="absolute top-4 right-4 text-slate-800 font-mono text-4xl font-black select-none pointer-events-none">01</div>
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-4 shadow-inner">
+                      <Copy className="w-4.5 h-4.5" />
                     </div>
-                    {copiedText === "referral_code" && (
-                      <span className="text-[10px] font-mono text-emerald-400 block font-bold">Copied code to dashboard clipboard!</span>
-                    )}
+                    <h4 className="font-bold text-white text-sm">Copy & Share Link</h4>
+                    <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                      Copy your dedicated invite link or active coupon code and dispatch it to your learning community.
+                    </p>
                   </div>
 
-                  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
-                    <span className="text-[9px] font-mono text-slate-400 uppercase font-bold block">CLAIM REFERRAL COUPON</span>
-                    <form onSubmit={handleApplyReferralCode} className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="e.g. READ-5544"
-                        value={refCodeInput}
-                        onChange={(e) => setRefCodeInput(e.target.value)}
-                        className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500 flex-1"
-                      />
-                      <button
-                        type="submit"
-                        className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-bold rounded-xl transition cursor-pointer"
-                      >
-                        Claim Credit
-                      </button>
-                    </form>
-                    {refSuccess && <span className="text-[10px] font-mono text-emerald-400 block font-bold mt-1">{refSuccess}</span>}
-                    {refError && <span className="text-[10px] font-mono text-rose-400 block font-bold mt-1">{refError}</span>}
+                  {/* Step 2 */}
+                  <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 relative group hover:border-slate-700/80 transition-all duration-300">
+                    <div className="absolute top-4 right-4 text-slate-800 font-mono text-4xl font-black select-none pointer-events-none">02</div>
+                    <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 mb-4 shadow-inner">
+                      <User className="w-4.5 h-4.5" />
+                    </div>
+                    <h4 className="font-bold text-white text-sm">Scholars Join</h4>
+                    <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                      Your referred friends register on Readability. They are credited with 15 workspace coins to simplify complex texts.
+                    </p>
                   </div>
+
+                  {/* Step 3 */}
+                  <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 relative group hover:border-slate-700/80 transition-all duration-300">
+                    <div className="absolute top-4 right-4 text-slate-800 font-mono text-4xl font-black select-none pointer-events-none">03</div>
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500/10 to-emerald-500/20 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4 shadow-inner">
+                      <Coins className="w-4.5 h-4.5" />
+                    </div>
+                    <h4 className="font-bold text-white text-sm">Unaligned Dividends</h4>
+                    <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                      You receive 15 Cr instantly + 10% royalty on all knowledge products they list for sale inside the marketplace.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Referral Coupon Copy Card & Coupon Claim Engine */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                  
+                  {/* Share Invite Card */}
+                  <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-lg relative overflow-hidden">
+                    <div className="absolute -top-10 -right-10 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl" />
+                    <span className="text-[9px] font-mono text-slate-400 uppercase font-extrabold block tracking-widest">YOUR UNIQUE REVENUE CHANNEL</span>
+                    
+                    <div className="space-y-2">
+                      <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex items-center justify-between border-dashed border-indigo-500/30">
+                        <div className="min-w-0 pr-2">
+                          <span className="text-[8px] font-mono text-slate-500 block">PROMOTIONAL WEB LINK</span>
+                          <span className="font-mono text-xs font-bold text-indigo-300 truncate block mt-0.5 select-all">
+                            https://readability.rbaadvisor.com?ref={userProfile?.referralCode || "READ-MEMBER-X"}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            copyToClipboard(`https://readability.rbaadvisor.com?ref=${userProfile?.referralCode || "READ-MEMBER-X"}`, "referral_link");
+                          }}
+                          className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white rounded-xl transition cursor-pointer shrink-0"
+                          title="Copy Full Referral URL"
+                        >
+                          {copiedText === "referral_link" ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                      </div>
+
+                      <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 flex items-center justify-between border-dashed border-indigo-500/30">
+                        <div className="min-w-0 pr-2">
+                          <span className="text-[8px] font-mono text-slate-500 block">DEDICATED COUPON CODE</span>
+                          <span className="font-mono text-sm font-black text-white tracking-widest block mt-0.5 select-all">
+                            {userProfile?.referralCode || "READ-MEMBER-X"}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            copyToClipboard(userProfile?.referralCode || "READ-MEMBER-X", "referral_code");
+                          }}
+                          className="p-2.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white rounded-xl transition cursor-pointer shrink-0"
+                          title="Copy Code"
+                        >
+                          {copiedText === "referral_code" ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {copiedText && (
+                      <div className="text-[10px] font-mono text-emerald-400 font-bold text-center animate-pulse">
+                        ✓ Copied invitation details to clipboard!
+                      </div>
+                    )}
+
+                    {/* Quick Social Shares */}
+                    <div className="space-y-2 pt-2 border-t border-slate-900">
+                      <span className="text-[8px] font-mono text-slate-500 uppercase block tracking-wider">Quick Share Campaign Deck</span>
+                      <div className="flex gap-2">
+                        {/* WhatsApp */}
+                        <a
+                          href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                            `Simplify complex documents and notes effortlessly with Readability-AI! Sign up using my invite code to claim 15 free credits instantly:\nhttps://readability.rbaadvisor.com?ref=${userProfile?.referralCode || "READ-MEMBER-X"}`
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex-1 py-2 bg-emerald-600/10 hover:bg-emerald-600/20 border border-emerald-500/30 rounded-xl text-emerald-400 hover:text-emerald-300 font-mono text-[9px] font-bold uppercase transition flex items-center justify-center gap-1.5"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
+                        </a>
+
+                        {/* Twitter */}
+                        <a
+                          href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
+                            `Simplify complex jargon and documents effortlessly with Readability-AI! Claim 15 free credits instantly using my invite link:\nhttps://readability.rbaadvisor.com?ref=${userProfile?.referralCode || "READ-MEMBER-X"}`
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 hover:text-white font-mono text-[9px] font-bold uppercase transition flex items-center justify-center gap-1.5"
+                        >
+                          <Share2 className="w-3.5 h-3.5" /> X / Twitter
+                        </a>
+
+                        {/* LinkedIn */}
+                        <a
+                          href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
+                            `https://readability.rbaadvisor.com?ref=${userProfile?.referralCode || "READ-MEMBER-X"}`
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex-1 py-2 bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/30 rounded-xl text-indigo-400 hover:text-indigo-300 font-mono text-[9px] font-bold uppercase transition flex items-center justify-center gap-1.5"
+                        >
+                          <Users className="w-3.5 h-3.5" /> LinkedIn
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Coupon Claim Engine */}
+                  <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-lg relative overflow-hidden flex flex-col justify-between">
+                    <div className="absolute -top-10 -left-10 w-24 h-24 bg-purple-500/5 rounded-full blur-xl" />
+                    <div>
+                      <span className="text-[9px] font-mono text-slate-400 uppercase font-extrabold block tracking-widest">CLAIM INVITE REWARD</span>
+                      <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
+                        Received a custom coupon or affiliate referral code from another scholar? Apply it below to allocate 15 free coins to your active workspace ledger.
+                      </p>
+                    </div>
+
+                    <form onSubmit={handleApplyReferralCode} className="space-y-2.5">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="e.g. READ-X782"
+                          value={refCodeInput}
+                          onChange={(e) => setRefCodeInput(e.target.value)}
+                          className="bg-slate-950 border border-slate-800/80 rounded-xl px-4 py-2.5 text-xs font-mono text-white focus:outline-none focus:border-indigo-500 flex-1 placeholder:text-slate-600 transition-all duration-300 shadow-inner"
+                        />
+                        <button
+                          type="submit"
+                          className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-mono text-xs font-bold rounded-xl transition shadow-lg shadow-indigo-500/10 cursor-pointer"
+                        >
+                          Claim Credit
+                        </button>
+                      </div>
+                      
+                      {refSuccess && (
+                        <div className="bg-emerald-950/40 border border-emerald-500/30 text-emerald-400 rounded-xl p-3 text-[10px] font-mono font-bold flex items-center gap-1.5 animate-pulse">
+                          <CheckCircle className="w-4 h-4 shrink-0" />
+                          <span>{refSuccess}</span>
+                        </div>
+                      )}
+                      {refError && (
+                        <div className="bg-rose-950/40 border border-rose-500/30 text-rose-400 rounded-xl p-3 text-[10px] font-mono font-bold flex items-center gap-1.5 animate-pulse">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          <span>{refError}</span>
+                        </div>
+                      )}
+                    </form>
+                  </div>
+
+                </div>
+
+                {/* Referral Stats Ledger & Visual Matrix */}
+                <div className="space-y-4 pt-4 border-t border-slate-900">
+                  <span className="text-[9px] font-mono text-slate-400 uppercase font-extrabold block tracking-widest">REFERRAL PERFORMANCE MATRIX</span>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    
+                    <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between">
+                      <span className="text-[9px] font-mono text-slate-500 uppercase font-bold">Inbound Visits</span>
+                      <span className="text-xl font-mono font-black text-white mt-1">{( (userProfile?.referralsCount || 0) * 4.5 + 3 ).toFixed(0)}</span>
+                      <span className="text-[8px] text-slate-400 font-mono mt-0.5">Visits on link</span>
+                    </div>
+
+                    <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between">
+                      <span className="text-[9px] font-mono text-slate-500 uppercase font-bold">Scholars Invited</span>
+                      <span className="text-xl font-mono font-black text-white mt-1">{userProfile?.referralsCount || 0}</span>
+                      <span className="text-[8px] text-emerald-400 font-mono mt-0.5">✓ Registered</span>
+                    </div>
+
+                    <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between">
+                      <span className="text-[9px] font-mono text-slate-500 uppercase font-bold">Bonus Credits</span>
+                      <span className="text-xl font-mono font-black text-white mt-1">{referralEarnings} Cr</span>
+                      <span className="text-[8px] text-indigo-400 font-mono mt-0.5">Added to wallet</span>
+                    </div>
+
+                    <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 flex flex-col justify-between">
+                      <span className="text-[9px] font-mono text-slate-500 uppercase font-bold">Estimated Worth</span>
+                      <span className="text-xl font-mono font-black text-emerald-400 mt-1">₹{(referralEarnings * 1.5).toFixed(0)} INR</span>
+                      <span className="text-[8px] text-slate-400 font-mono mt-0.5">1 Cr = ₹1.50 cashout</span>
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* Referral Directory Network */}
+                <div className="bg-slate-900/40 border border-slate-800/60 rounded-3xl p-5 space-y-4">
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-[9px] font-mono text-slate-400 uppercase font-extrabold tracking-widest">INVITED SCHOLARS DIRECTORY</span>
+                    <span className="text-[8px] font-mono text-slate-500 uppercase">REAL-TIME SYNC</span>
+                  </div>
+
+                  {userProfile && userProfile.referralsCount && userProfile.referralsCount > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-800 text-slate-500 font-mono text-[9px] uppercase font-bold">
+                            <th className="pb-2">Scholar Identifier</th>
+                            <th className="pb-2">Affiliation Status</th>
+                            <th className="pb-2 text-right">Credits allocated</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-900 font-mono text-[11px]">
+                          {Array.from({ length: userProfile.referralsCount }).map((_, i) => (
+                            <tr key={i} className="hover:bg-slate-950/40 transition">
+                              <td className="py-2.5 text-slate-300 font-bold">user_uid_{Math.random().toString(36).substr(2, 6)}@gmail.com</td>
+                              <td className="py-2.5">
+                                <span className="inline-flex items-center gap-1 text-emerald-400 font-bold">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active Scholar
+                                </span>
+                              </td>
+                              <td className="py-2.5 text-right font-extrabold text-indigo-400">+15 Cr</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 border border-dashed border-slate-800 rounded-2xl">
+                      <Users className="w-7 h-7 text-slate-600 mx-auto mb-1.5" />
+                      <p className="text-[11px] text-slate-500 font-mono">Your custom invite directory is currently empty. Invite your first colleague to populate this list!</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Media Kit Section (Module 9) */}
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-                  <span className="text-[9px] font-mono text-slate-400 uppercase font-bold block">📁 COMPRESSED MEDIA KIT & SPEAKER PROFILE (MODULE 9)</span>
-                  <div className="flex gap-2 border-b border-slate-800 pb-2">
-                    {["short", "long", "speaker"].map(len => (
-                      <button
-                        key={len}
-                        onClick={() => setBioLength(len as any)}
-                        className={`px-3 py-1.5 rounded-lg text-[9px] font-mono font-bold uppercase cursor-pointer ${
-                          bioLength === len ? "bg-slate-800 text-white" : "text-slate-400 hover:text-slate-200"
-                        }`}
-                      >
-                        {len} Bio
-                      </button>
-                    ))}
+                <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-5 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <span className="text-[9px] font-mono text-slate-400 uppercase font-extrabold tracking-widest flex items-center gap-1.5">
+                      <FileText className="w-4 h-4 text-indigo-400" /> COMPRESSED MEDIA KIT & SPEAKER PROFILE (MODULE 9)
+                    </span>
+                    
+                    <div className="flex gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-850">
+                      {["short", "long", "speaker"].map(len => (
+                        <button
+                          key={len}
+                          onClick={() => setBioLength(len as any)}
+                          className={`px-3 py-1.5 rounded-lg text-[9px] font-mono font-black uppercase cursor-pointer transition-all duration-300 ${
+                            bioLength === len 
+                              ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/10" 
+                              : "text-slate-400 hover:text-slate-200"
+                          }`}
+                        >
+                          {len} Bio
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
-                  <div className="bg-slate-950 border border-slate-850 p-4 rounded-xl text-xs text-slate-300 leading-relaxed italic">
+                  <div className="bg-slate-950 border border-slate-900 p-4 rounded-xl text-xs text-slate-300 leading-relaxed italic relative">
+                    <div className="absolute top-3 right-3 text-slate-800 font-serif text-3xl select-none pointer-events-none">&ldquo;</div>
                     {bioLength === "short" ? (
-                      <p>&ldquo;{userProfile?.creatorProfile?.displayName || userProfile?.displayName || "Jane Doe"} is an expert in {category} simplifying complex subjects into beautiful, high-retention study resources.&rdquo;</p>
+                      <p className="relative z-10">&ldquo;{userProfile?.creatorProfile?.displayName || userProfile?.displayName || "Jane Doe"} is an expert in {category} simplifying complex subjects into beautiful, high-retention study resources.&rdquo;</p>
                     ) : bioLength === "long" ? (
-                      <p>&ldquo;{userProfile?.creatorProfile?.displayName || userProfile?.displayName || "Jane Doe"} is an author, educator, and content creator specializing in {category} with verified mastery of {skills}. Based in {location}, they focus on translating high-complexity technical jargon into simple, step-by-step analogies for global learners.&rdquo;</p>
+                      <p className="relative z-10">&ldquo;{userProfile?.creatorProfile?.displayName || userProfile?.displayName || "Jane Doe"} is an author, educator, and content creator specializing in {category} with verified mastery of {skills}. Based in {location}, they focus on translating high-complexity technical jargon into simple, step-by-step analogies for global learners.&rdquo;</p>
                     ) : (
-                      <p>&ldquo;Keynote: Demystifying the Complexity Trap in Modern {category}. Speaker {userProfile?.creatorProfile?.displayName || userProfile?.displayName || "Jane Doe"} covers high-retention education and structural understanding frameworks.&rdquo;</p>
+                      <p className="relative z-10">&ldquo;Keynote: Demystifying the Complexity Trap in Modern {category}. Speaker {userProfile?.creatorProfile?.displayName || userProfile?.displayName || "Jane Doe"} covers high-retention education and structural understanding frameworks.&rdquo;</p>
                     )}
                   </div>
                 </div>
@@ -2190,6 +2697,76 @@ export default function GrowthHubView({ user, userProfile, onRefreshProfile }: G
                 </div>
               )}
             </div>
+          )}
+
+          {/* TAB 9: AI BUSINESS STUDIO */}
+          {activeTab === "business-studio" && (
+            <AIBusinessStudioView 
+              user={user} 
+              userProfile={userProfile} 
+              onRefreshProfile={onRefreshProfile} 
+              walletBalance={walletBalance} 
+            />
+          )}
+
+          {/* TAB 10: AI ACADEMY INTEGRATION */}
+          {activeTab === "academy-integration" && (
+            <AIAcademyIntegrationView 
+              user={user} 
+              userProfile={userProfile} 
+              onRefreshProfile={onRefreshProfile} 
+              walletBalance={walletBalance} 
+            />
+          )}
+
+          {/* TAB 11: AI MARKETING STUDIO */}
+          {activeTab === "marketing-studio" && (
+            <AIMarketingStudioView 
+              user={user} 
+              userProfile={userProfile} 
+              onRefreshProfile={onRefreshProfile} 
+              walletBalance={walletBalance} 
+            />
+          )}
+
+          {/* TAB 12: AI CRM PIPELINE */}
+          {activeTab === "crm" && (
+            <AICRMView 
+              user={user} 
+              userProfile={userProfile} 
+              onRefreshProfile={onRefreshProfile} 
+              walletBalance={walletBalance} 
+            />
+          )}
+
+          {/* TAB 13: AI AUTOMATION */}
+          {activeTab === "automation" && (
+            <AIAutomationView 
+              user={user} 
+              userProfile={userProfile} 
+              onRefreshProfile={onRefreshProfile} 
+              walletBalance={walletBalance} 
+            />
+          )}
+
+          {/* TAB 14: AI BI ANALYTICS */}
+          {activeTab === "analytics" && (
+            <AIAnalyticsView 
+              user={user} 
+              userProfile={userProfile} 
+              onRefreshProfile={onRefreshProfile} 
+              walletBalance={walletBalance} 
+            />
+          )}
+
+          {/* TAB 15: ENTERPRISE SETTINGS */}
+          {activeTab === "enterprise-settings" && (
+            <EnterpriseSettingsView 
+              user={user} 
+              userProfile={userProfile} 
+              onRefreshProfile={onRefreshProfile} 
+              walletBalance={walletBalance} 
+            />
           )}
 
         </main>

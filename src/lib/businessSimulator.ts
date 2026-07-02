@@ -1,3 +1,90 @@
+export function generateSimulatedCaReview(
+  nameOfCompany: string, 
+  nameOfState: string, 
+  budgetAmount: number, 
+  industry: string,
+  applicantProfile?: any,
+  businessProfile?: any
+) {
+  const isMP = nameOfState.toLowerCase().includes("madhya pradesh") || nameOfState.toLowerCase().includes("mp");
+  const isMaharashtra = nameOfState.toLowerCase().includes("maharashtra") || nameOfState.toLowerCase().includes("mh");
+  const isSaaS = industry.toLowerCase().includes("saas") || industry.toLowerCase().includes("ai") || industry.toLowerCase().includes("tech") || industry.toLowerCase().includes("software");
+  
+  const hasGst = !!businessProfile?.gstNumber;
+  const hasUdyam = !!businessProfile?.udyamRegistration;
+  const hasCin = !!businessProfile?.cinNumber;
+  const hasBank = !!businessProfile?.bankDetails?.accountNo;
+  const hasGuarantor = !!businessProfile?.guarantor?.name;
+
+  const missingDocs: string[] = [];
+  if (hasUdyam) {
+    missingDocs.push(`✓ MSME UDYAM Registration Certificate Verified (Reg No: ${businessProfile.udyamRegistration})`);
+  } else {
+    missingDocs.push("MSME UDYAM Registration Certificate (Highly recommended for 1% interest subvention and CGTMSE loan eligibility)");
+  }
+
+  if (hasGst) {
+    missingDocs.push(`✓ GSTIN Registration Verified (GSTIN: ${businessProfile.gstNumber})`);
+  } else {
+    missingDocs.push(`GSTIN Certificate (Mandatory for inter-state commercial sales and bank loan verification in ${nameOfState})`);
+  }
+
+  if (hasCin) {
+    missingDocs.push(`✓ Corporate CIN Certificate Verified (CIN: ${businessProfile.cinNumber})`);
+  } else {
+    missingDocs.push("Corporate Incorporation Certificate & MOA/AOA (Required for LLP / Private Limited structure)");
+  }
+
+  if (hasBank) {
+    missingDocs.push(`✓ Bank Account Mandate Verified (Acc No: ${businessProfile.bankDetails.accountNo}, IFSC: ${businessProfile.bankDetails.ifsc}, Bank: ${businessProfile.bankDetails.bankName})`);
+  } else {
+    missingDocs.push("Primary Business Bank Account Mandate & 6 Months Account Statements");
+  }
+
+  if (hasGuarantor) {
+    missingDocs.push(`✓ Sovereign Third-Party Guarantor Registered (Name: ${businessProfile.guarantor.name}, Net Worth: ₹${Number(businessProfile.guarantor.netWorth).toLocaleString("en-IN")})`);
+  } else {
+    missingDocs.push("Third-Party Sovereign Guarantor Deed (Crucial for unsecured or CGTMSE bank credit appraisal)");
+  }
+
+  missingDocs.push(`Shops and Establishments Act License from ${nameOfState} Labor Department`);
+  missingDocs.push("Three Independent Machinery / Capital Equipment Cost Quotations");
+
+  return {
+    taxSuggestions: `
+### Professional Tax Planning & Incentives (Income Tax Act 1961)
+
+1. **Startup India Tax Holiday (Section 80-IAC)**: If registered under the Startup India initiative, **${nameOfCompany}** can apply for a 100% tax holiday on profits for 3 consecutive fiscal years out of its first 10 years, subject to DPIIT validation.
+2. **Accelerated Depreciation Benefits (Section 32)**: You are entitled to claim up to 40% accelerated depreciation on energy-efficient machinery, automated grids, or customized software systems deployed in this financial year.
+3. **Presumptive Taxation Option (Section 44AD / 44ADA)**: If operating as a proprietorship or partnership with annual turnover under ₹2 Crore (₹3 Crore for 95%+ digital transactions), you can opt for presumptive taxation under Section 44AD, declaring profits at flat 6% to 8% without tedious bookkeeping.
+4. **Deduction for New Employees (Section 80JJAA)**: Earn an additional 30% tax deduction on the cost of newly recruited regular employees for 3 consecutive years, substantially lowering tax liabilities as you build your operational workforce.
+    `.trim(),
+    
+    gstSuggestions: `
+### GST Compliance & Optimization Architecture
+
+1. **Registration Thresholds**: Standard registration is mandatory if annual turnover exceeds ₹40 Lakhs for goods suppliers, or ₹20 Lakhs for service-based businesses in **${nameOfState}**. For inter-state sales or e-commerce, registration is required from rupee one.
+2. **Composition Scheme Benefits (Section 10)**: For turnovers under ₹1.5 Crore, you can pay a flat GST (1% for manufacturing/trading, 6% for service) with simplified quarterly filings. Note that you cannot pass on Input Tax Credit (ITC) or issue standard tax invoices under this scheme.
+3. **Input Tax Credit (ITC) Safeguarding**: Verify that all major capital purchase quotations and electricity utility accounts carry your valid GSTIN. This lets you offset output liabilities directly, saving up to 18% in procurement cash drains.
+4. **Export Zero-Rated Supplies**: If providing software or services internationally, submit a Letter of Undertaking (LUT) on the GST portal to bypass upfront IGST payments entirely.
+    `.trim(),
+    
+    complianceReview: `
+### Corporate Compliance Calendar & Statutory Mandates
+
+1. **ROC Incorporation Compliances**: If operating as a Private Limited or LLP, ensure you appoint first auditors within 30 days of registration, and file Form INC-20A (Commencement of Business) within 180 days.
+2. **MSME Payment Safeguard (Section 15 of MSMED Act)**: For any supplies procured from registered micro/small units, payments must be cleared within 45 days. Delayed payments incur compound interest at three times the RBI bank rate, which cannot be claimed as tax-deductible business expenses.
+3. **Shops & Establishments License**: Obtain the mandatory registration from the **${nameOfState}** labor department website within 30 days of setting up your commercial office.
+4. **Pollution NOC & Environmental Consents**: If manufacturing or food processing is involved, file CTE (Consent to Establish) and CTO (Consent to Operate) with the State Pollution Control Board prior to commercial trials.
+    `.trim(),
+    
+    missingDocuments: missingDocs,
+    riskRating: budgetAmount > 10000000 ? "Medium-High" : budgetAmount > 2000000 ? "Medium" : "Low-Medium",
+    bankReadinessScore: Math.min(100, 60 + (hasGst ? 10 : 0) + (hasUdyam ? 10 : 0) + (hasBank ? 10 : 0) + (hasGuarantor ? 10 : 0)),
+    investorReadinessScore: Math.min(100, 55 + (hasCin ? 15 : 0) + (hasGst ? 15 : 0) + (hasBank ? 15 : 0))
+  };
+}
+
 export function getSimulatedBusinessReport(
   topic: string, 
   industry: string, 
@@ -5,7 +92,10 @@ export function getSimulatedBusinessReport(
   currency: string,
   companyName?: string,
   stateName?: string,
-  budgetAmount?: number
+  budgetAmount?: number,
+  applicantProfile?: any,
+  businessProfile?: any,
+  projectInformation?: any
 ) {
   const normTopic = topic.toLowerCase();
   const nameOfCompany = companyName ? companyName.trim() : `${topic} Enterprise`;
@@ -164,7 +254,8 @@ Position **${nameOfCompany}** as a warm, honest, family-owned farm. Use organic 
       faq: [
         { question: "What is A2 milk and why is it premium?", answer: "A2 milk contains only the A2 type of beta-casein protein, which is highly digestible and less prone to causing gut inflammation compared to common A1 milk." },
         { question: "How do you manage cattle manure sustainably?", answer: "Manure is directed into a continuous anaerobic biogas digestor, generating electricity to power the farm's milking parlor and organic vermicompost ready for sale." }
-      ]
+      ],
+      caReview: generateSimulatedCaReview(nameOfCompany, nameOfState, actualBudgetAmount, industry)
     };
   }
 
@@ -290,7 +381,8 @@ Establish **${nameOfCompany}** as an elite, high-security, Swiss-level enterpris
       faq: [
         { question: "Is our proprietary company data used to train public models?", answer: "Absolutely not. All client data is processed inside secure, single-tenant isolated container environments and never pooled or shared with any external AI models." },
         { question: "How long does a standard onboarding integration take?", answer: "Using our pre-built legacy database connectors, most mid-market teams can set up their secure workflows and go live in under 5 business days." }
-      ]
+      ],
+      caReview: generateSimulatedCaReview(nameOfCompany, nameOfState, actualBudgetAmount, industry)
     };
   }
 
@@ -417,6 +509,7 @@ Establish **${nameOfCompany}** as an honest, premium, highly dependable regional
     faq: [
       { question: "How do you guarantee quality consistency?", answer: "We deploy triple-stage quality gatekeepers at raw supply receipt, active execution, and final customer delivery." },
       { question: "Can the services be customized for larger enterprise contracts?", answer: "Yes, our operational workflow is designed to scale dynamically to meet specific custom requirements." }
-    ]
+    ],
+    caReview: generateSimulatedCaReview(nameOfCompany, nameOfState, actualBudgetAmount, industry, applicantProfile, businessProfile)
   };
 }

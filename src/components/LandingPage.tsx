@@ -22,6 +22,7 @@ import {
   LogIn
 } from "lucide-react";
 import UserSuccessStories from "./UserSuccessStories";
+import ComplianceModal from "./ComplianceModal";
 
 interface LandingPageProps {
   onSignIn: () => void;
@@ -34,6 +35,9 @@ export default function LandingPage({ onSignIn, isAuthLoading }: LandingPageProp
   
   // State for FAQ accordions
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
+  
+  // Compliance modal state
+  const [complianceTab, setComplianceTab] = useState<"privacy" | "terms" | "refund" | "contact" | "about" | null>(null);
 
   const toggleFaq = (index: number) => {
     setOpenFaqIndex(openFaqIndex === index ? null : index);
@@ -688,12 +692,30 @@ export default function LandingPage({ onSignIn, isAuthLoading }: LandingPageProp
             </div>
           </div>
           
-          <div className="flex flex-col md:items-end text-center md:text-right gap-1.5 font-semibold">
+          <div className="flex flex-col items-center md:items-end text-center md:text-right gap-2 font-semibold">
+            <div className="flex flex-wrap justify-center md:justify-end gap-x-3 gap-y-1 text-[10px] text-slate-500 uppercase tracking-wider mb-1">
+              <button onClick={() => setComplianceTab("about")} className="hover:text-indigo-600 transition cursor-pointer">About Us</button>
+              <span>&bull;</span>
+              <button onClick={() => setComplianceTab("privacy")} className="hover:text-indigo-600 transition cursor-pointer">Privacy Policy</button>
+              <span>&bull;</span>
+              <button onClick={() => setComplianceTab("terms")} className="hover:text-indigo-600 transition cursor-pointer">Terms & Conditions</button>
+              <span>&bull;</span>
+              <button onClick={() => setComplianceTab("refund")} className="hover:text-indigo-600 transition cursor-pointer">Refund Policy</button>
+              <span>&bull;</span>
+              <button onClick={() => setComplianceTab("contact")} className="hover:text-indigo-600 transition cursor-pointer">Contact Us</button>
+            </div>
             <p>&copy; {new Date().getFullYear()} READABILITY AI. ALL RIGHTS OF CLARITY PRESERVED.</p>
-            <p className="text-[10px]">POWERED BY GEMINI-3.5-FLASH &bull; CORE ENGINE: MR. KILVISH</p>
+            <p className="text-[10px] text-slate-400 font-medium">POWERED BY GEMINI-3.5-FLASH &bull; CORE ENGINE: MR. KILVISH</p>
           </div>
         </div>
       </footer>
+
+      {complianceTab && (
+        <ComplianceModal 
+          initialTab={complianceTab} 
+          onClose={() => setComplianceTab(null)} 
+        />
+      )}
 
     </div>
   );

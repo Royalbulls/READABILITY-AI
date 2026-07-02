@@ -36,10 +36,66 @@ export interface TransactionRecord {
   currency: string;
   status: "pending" | "success" | "failed";
   orderId: string;
-  type: "payment" | "referral_bonus" | "manual_adjustment";
+  type: "payment" | "referral_bonus" | "manual_adjustment" | "subscription_renewal" | "refund" | "purchase";
   creditsAllocated: number;
   description: string;
   timestamp: number;
+  planName?: string;
+}
+
+export interface SubscriptionRecord {
+  id: string; // Subscription ID or PayU subscription ID
+  userId: string;
+  planId: "free" | "starter" | "pro" | "creator" | "enterprise";
+  planName: string;
+  amount: number;
+  currency: string;
+  status: "active" | "cancelled" | "pending" | "expired" | "failed";
+  paymentStartDate: number;
+  paymentEndDate: number;
+  nextBillingDate: number;
+  autoRenew: boolean;
+  createdAt: number;
+  updatedAt: number;
+  gateway: "payu";
+  payuSubscriptionId?: string;
+  paymentMethod?: string;
+}
+
+export interface WalletLedgerRecord {
+  id: string;
+  userId: string;
+  type: "credit_renewal" | "credit_purchase" | "usage_deduction" | "referral_bonus" | "refund" | "manual_adjustment";
+  amount: number; // credits changed
+  previousBalance: number;
+  newBalance: number;
+  description: string;
+  referenceId: string; // invoiceId, transactionId or orderId
+  timestamp: number;
+}
+
+export interface InvoiceRecord {
+  id: string;
+  userId: string;
+  subscriptionId?: string;
+  transactionId?: string;
+  planName: string;
+  amount: number;
+  gstAmount: number; // GST 18% etc
+  totalAmount: number;
+  status: "paid" | "unpaid" | "refunded";
+  billingName: string;
+  billingEmail: string;
+  billingPhone: string;
+  timestamp: number;
+}
+
+export interface WebhookLogRecord {
+  id: string;
+  timestamp: number;
+  payload: any;
+  status: "success" | "failed" | "duplicate";
+  error?: string;
 }
 
 // ==========================================
@@ -51,17 +107,42 @@ const LOCAL_DB_PATH = path.join(process.cwd(), "local_db.json");
 interface LocalData {
   users: Record<string, UserProfile>;
   transactions: Record<string, TransactionRecord>;
+  subscriptions: Record<string, SubscriptionRecord>;
+  walletLedger: Record<string, WalletLedgerRecord>;
+  invoices: Record<string, InvoiceRecord>;
+  webhookLogs: WebhookLogRecord[];
+  waitlist?: Record<string, any>;
+  feedback?: Record<string, any>;
 }
 
-function loadLocalDB(): LocalData {
+function loadLocalDB(): Required<LocalData> {
   try {
     if (fs.existsSync(LOCAL_DB_PATH)) {
-      return JSON.parse(fs.readFileSync(LOCAL_DB_PATH, "utf8"));
+      const data = JSON.parse(fs.readFileSync(LOCAL_DB_PATH, "utf8"));
+      return {
+        users: data.users || {},
+        transactions: data.transactions || {},
+        subscriptions: data.subscriptions || {},
+        walletLedger: data.walletLedger || {},
+        invoices: data.invoices || {},
+        webhookLogs: data.webhookLogs || [],
+        waitlist: data.waitlist || {},
+        feedback: data.feedback || {}
+      };
     }
   } catch (e) {
     console.error("[Server DB] Failed to load local DB:", e);
   }
-  return { users: {}, transactions: {} };
+  return {
+    users: {},
+    transactions: {},
+    subscriptions: {},
+    walletLedger: {},
+    invoices: {},
+    webhookLogs: [],
+    waitlist: {},
+    feedback: {}
+  };
 }
 
 function saveLocalDB(data: LocalData) {
@@ -975,7 +1056,7 @@ export async function getAnalyticsData(): Promise<any> {
 - **User Sentiment Score**: ${feedback.length > 0 ? (feedback.reduce((sum, f) => sum + (f.rating || 5), 0) / feedback.length).toFixed(1) : "5.0"}/5.0 based on ${feedback.length} submissions.
 
 ## 3. Financial Summary
-- **Gross Revenue (Cashfree orders)**: ₹${totalRevenue} INR.
+- **Gross Revenue (PayU orders)**: ₹${totalRevenue} INR.
 - **Customer Acquisition Cost (CAC)**: ₹0 (100% organic launch loop driving user signups).
 
 ## 4. Key Recommendations & Next Growth Steps
@@ -1287,4 +1368,459 @@ export async function adminUpdateCreatorBackend(creatorId: string, updates: any)
     return adminUpdateCreatorBackend(creatorId, updates);
   }
 }
+
+export async function getSubscriptionStatus(uid: string): Promise<SubscriptionRecord | null> {
+  if (useLocalFallback) {
+    const ldb = loadLocalDB();
+    const subs = Object.values(ldb.subscriptions).filter(s => s.userId === uid);
+    if (subs.length === 0) return null;
+    subs.sort((a, b) => b.updatedAt - a.updatedAt);
+    return subs[0];
+  }
+  try {
+    const snap = await db.collection("subscriptions")
+      .where("userId", "==", uid)
+      .get();
+    if (snap.empty) return null;
+    const list: SubscriptionRecord[] = [];
+    snap.forEach(doc => {
+      list.push(doc.data() as SubscriptionRecord);
+    });
+    list.sort((a, b) => b.updatedAt - a.updatedAt);
+    return list[0];
+  } catch (err) {
+    if (isPermissionError(err)) {
+      useLocalFallback = true;
+      return getSubscriptionStatus(uid);
+    }
+    throw err;
+  }
+}
+
+export async function createOrUpdateSubscription(sub: SubscriptionRecord): Promise<void> {
+  if (useLocalFallback) {
+    const ldb = loadLocalDB();
+    ldb.subscriptions[sub.id] = sub;
+    saveLocalDB(ldb);
+    return;
+  }
+  try {
+    await db.collection("subscriptions").doc(sub.id).set(sub);
+  } catch (err) {
+    if (isPermissionError(err)) {
+      useLocalFallback = true;
+      return createOrUpdateSubscription(sub);
+    }
+    throw err;
+  }
+}
+
+export async function cancelSubscription(subscriptionId: string): Promise<void> {
+  if (useLocalFallback) {
+    const ldb = loadLocalDB();
+    const sub = ldb.subscriptions[subscriptionId];
+    if (sub) {
+      sub.status = "cancelled";
+      sub.autoRenew = false;
+      sub.updatedAt = Date.now();
+      saveLocalDB(ldb);
+    }
+    return;
+  }
+  try {
+    await db.collection("subscriptions").doc(subscriptionId).update({
+      status: "cancelled",
+      autoRenew: false,
+      updatedAt: Date.now()
+    });
+  } catch (err) {
+    if (isPermissionError(err)) {
+      useLocalFallback = true;
+      return cancelSubscription(subscriptionId);
+    }
+    throw err;
+  }
+}
+
+export async function refundSubscriptionBackend(subscriptionId: string): Promise<void> {
+  const list = await getSubscriptionList();
+  const sub = list.find(s => s.id === subscriptionId);
+  if (!sub) {
+    throw new Error("Subscription not found.");
+  }
+
+  sub.status = "expired";
+  sub.autoRenew = false;
+  sub.updatedAt = Date.now();
+  await createOrUpdateSubscription(sub);
+
+  const creditsToDeduct = sub.amount === 299 ? 150 : sub.amount === 799 ? 500 : sub.amount === 1499 ? 1000 : 5000;
+  
+  if (useLocalFallback) {
+    const ldb = loadLocalDB();
+    const u = ldb.users[sub.userId];
+    if (u) {
+      u.walletBalance = Math.max(0, u.walletBalance - creditsToDeduct);
+      u.requestLimit = Math.max(0, u.requestLimit - creditsToDeduct);
+    }
+    saveLocalDB(ldb);
+  } else {
+    await db.collection("users").doc(sub.userId).update({
+      walletBalance: FieldValue.increment(-creditsToDeduct),
+      requestLimit: FieldValue.increment(-creditsToDeduct)
+    });
+  }
+
+  const ledgerId = `ledger_ref_${Date.now()}`;
+  await createWalletLedgerEntry({
+    id: ledgerId,
+    userId: sub.userId,
+    type: "refund",
+    amount: -creditsToDeduct,
+    previousBalance: 0,
+    newBalance: 0,
+    description: `Refund processed for ${sub.planName} Plan. Subscription revoked.`,
+    referenceId: subscriptionId,
+    timestamp: Date.now()
+  });
+}
+
+export async function createWalletLedgerEntry(entry: WalletLedgerRecord): Promise<void> {
+  if (useLocalFallback) {
+    const ldb = loadLocalDB();
+    ldb.walletLedger[entry.id] = entry;
+    saveLocalDB(ldb);
+    return;
+  }
+  try {
+    await db.collection("walletLedger").doc(entry.id).set(entry);
+  } catch (err) {
+    if (isPermissionError(err)) {
+      useLocalFallback = true;
+      return createWalletLedgerEntry(entry);
+    }
+    throw err;
+  }
+}
+
+export async function createInvoice(invoice: InvoiceRecord): Promise<void> {
+  if (useLocalFallback) {
+    const ldb = loadLocalDB();
+    ldb.invoices[invoice.id] = invoice;
+    saveLocalDB(ldb);
+    return;
+  }
+  try {
+    await db.collection("invoices").doc(invoice.id).set(invoice);
+  } catch (err) {
+    if (isPermissionError(err)) {
+      useLocalFallback = true;
+      return createInvoice(invoice);
+    }
+    throw err;
+  }
+}
+
+export async function logWebhook(log: WebhookLogRecord): Promise<void> {
+  if (useLocalFallback) {
+    const ldb = loadLocalDB();
+    // Use an array to store Webhook Logs locally
+    if (!ldb.webhookLogs) ldb.webhookLogs = [];
+    ldb.webhookLogs.push(log);
+    if (ldb.webhookLogs.length > 200) {
+      ldb.webhookLogs.shift();
+    }
+    saveLocalDB(ldb);
+    return;
+  }
+  try {
+    await db.collection("webhookLogs").doc(log.id).set(log);
+  } catch (err) {
+    if (isPermissionError(err)) {
+      useLocalFallback = true;
+      return logWebhook(log);
+    }
+    throw err;
+  }
+}
+
+export async function getSubscriptionList(uid?: string): Promise<SubscriptionRecord[]> {
+  if (useLocalFallback) {
+    const ldb = loadLocalDB();
+    const subs = Object.values(ldb.subscriptions);
+    if (uid) return subs.filter(s => s.userId === uid);
+    return subs;
+  }
+  try {
+    let q: any = db.collection("subscriptions");
+    if (uid) {
+      q = q.where("userId", "==", uid);
+    }
+    const snap = await q.get();
+    const list: SubscriptionRecord[] = [];
+    snap.forEach((doc: any) => {
+      list.push(doc.data() as SubscriptionRecord);
+    });
+    return list;
+  } catch (err) {
+    if (isPermissionError(err)) {
+      useLocalFallback = true;
+      return getSubscriptionList(uid);
+    }
+    throw err;
+  }
+}
+
+export async function getInvoiceList(uid?: string): Promise<InvoiceRecord[]> {
+  if (useLocalFallback) {
+    const ldb = loadLocalDB();
+    const invs = Object.values(ldb.invoices);
+    if (uid) return invs.filter(i => i.userId === uid);
+    return invs;
+  }
+  try {
+    let q: any = db.collection("invoices");
+    if (uid) {
+      q = q.where("userId", "==", uid);
+    }
+    const snap = await q.get();
+    const list: InvoiceRecord[] = [];
+    snap.forEach((doc: any) => {
+      list.push(doc.data() as InvoiceRecord);
+    });
+    return list;
+  } catch (err) {
+    if (isPermissionError(err)) {
+      useLocalFallback = true;
+      return getInvoiceList(uid);
+    }
+    throw err;
+  }
+}
+
+export async function getWalletLedgerList(uid?: string): Promise<WalletLedgerRecord[]> {
+  if (useLocalFallback) {
+    const ldb = loadLocalDB();
+    const ledger = Object.values(ldb.walletLedger);
+    if (uid) return ledger.filter(l => l.userId === uid);
+    return ledger;
+  }
+  try {
+    let q: any = db.collection("walletLedger");
+    if (uid) {
+      q = q.where("userId", "==", uid);
+    }
+    const snap = await q.get();
+    const list: WalletLedgerRecord[] = [];
+    snap.forEach((doc: any) => {
+      list.push(doc.data() as WalletLedgerRecord);
+    });
+    return list;
+  } catch (err) {
+    if (isPermissionError(err)) {
+      useLocalFallback = true;
+      return getWalletLedgerList(uid);
+    }
+    throw err;
+  }
+}
+
+export async function getWebhookLogs(): Promise<WebhookLogRecord[]> {
+  if (useLocalFallback) {
+    const ldb = loadLocalDB();
+    return ldb.webhookLogs || [];
+  }
+  try {
+    const snap = await db.collection("webhookLogs").orderBy("timestamp", "desc").limit(100).get();
+    const list: WebhookLogRecord[] = [];
+    snap.forEach(doc => {
+      list.push(doc.data() as WebhookLogRecord);
+    });
+    return list;
+  } catch (err) {
+    if (isPermissionError(err)) {
+      useLocalFallback = true;
+      return getWebhookLogs();
+    }
+    throw err;
+  }
+}
+
+export async function processPayUSubscriptionSuccess(txnid: string, payload: any): Promise<void> {
+  if (useLocalFallback) {
+    const ldb = loadLocalDB();
+    const txData = ldb.transactions[txnid];
+    if (!txData) throw new Error("Transaction record not found locally.");
+    if (txData.status === "success") return; // Idempotency check
+
+    txData.status = "success";
+    const user = ldb.users[txData.userId];
+    if (!user) throw new Error("User not found locally.");
+
+    const previousBalance = user.walletBalance;
+    user.walletBalance += txData.creditsAllocated;
+    user.requestLimit += txData.creditsAllocated;
+
+    const now = Date.now();
+    const nextBilling = now + 30 * 24 * 60 * 60 * 1000;
+
+    // Create subscription
+    const subRecord: SubscriptionRecord = {
+      id: txnid,
+      userId: txData.userId,
+      planId: txData.planName.toLowerCase() as any,
+      planName: txData.planName,
+      amount: txData.amount,
+      currency: "INR",
+      status: "active",
+      paymentStartDate: now,
+      paymentEndDate: now + 365 * 24 * 60 * 60 * 1000,
+      nextBillingDate: nextBilling,
+      autoRenew: true,
+      createdAt: now,
+      updatedAt: now,
+      gateway: "payu",
+      payuSubscriptionId: txnid,
+      paymentMethod: payload.mode || "mandate"
+    };
+    ldb.subscriptions[txnid] = subRecord;
+
+    // Create ledger
+    const ledgerId = `ledger_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const ledgerRecord: WalletLedgerRecord = {
+      id: ledgerId,
+      userId: txData.userId,
+      type: "credit_renewal",
+      amount: txData.creditsAllocated,
+      previousBalance,
+      newBalance: user.walletBalance,
+      description: `Subscription renewal credits for ${txData.planName} Plan`,
+      referenceId: txnid,
+      timestamp: now
+    };
+    ldb.walletLedger[ledgerId] = ledgerRecord;
+
+    // Create invoice
+    const gstRate = 0.18;
+    const subtotal = txData.amount / (1 + gstRate);
+    const gstAmount = txData.amount - subtotal;
+    const invoiceId = `inv_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const invoiceRecord: InvoiceRecord = {
+      id: invoiceId,
+      userId: txData.userId,
+      subscriptionId: txnid,
+      transactionId: txnid,
+      planName: txData.planName,
+      amount: Number(subtotal.toFixed(2)),
+      gstAmount: Number(gstAmount.toFixed(2)),
+      totalAmount: Number(txData.amount),
+      status: "paid",
+      billingName: payload.firstname || user.displayName || "Readability Scholar",
+      billingEmail: payload.email || user.email || "scholar@readability.ai",
+      billingPhone: payload.phone || "9999999999",
+      timestamp: now
+    };
+    ldb.invoices[invoiceId] = invoiceRecord;
+
+    saveLocalDB(ldb);
+    return;
+  }
+
+  try {
+    const txRef = db.collection("transactions").doc(txnid);
+    const txSnap = await txRef.get();
+    if (!txSnap.exists) throw new Error("Transaction record not found in Firestore.");
+    
+    const txData = txSnap.data() as TransactionRecord;
+    if (txData.status === "success") return; // Idempotency check
+
+    await db.runTransaction(async (transaction) => {
+      const userRef = db.collection("users").doc(txData.userId);
+      const userSnap = await transaction.get(userRef);
+      if (!userSnap.exists) throw new Error("User profile not found in Firestore.");
+      const user = userSnap.data() as UserProfile;
+
+      const previousBalance = user.walletBalance;
+      const newBalance = previousBalance + txData.creditsAllocated;
+
+      // Update user
+      transaction.update(userRef, {
+        walletBalance: FieldValue.increment(txData.creditsAllocated),
+        requestLimit: FieldValue.increment(txData.creditsAllocated)
+      });
+
+      // Update transaction
+      transaction.update(txRef, { status: "success" });
+
+      const now = Date.now();
+      const nextBilling = now + 30 * 24 * 60 * 60 * 1000;
+
+      // Set subscription
+      const subRecord: SubscriptionRecord = {
+        id: txnid,
+        userId: txData.userId,
+        planId: txData.planName.toLowerCase() as any,
+        planName: txData.planName,
+        amount: txData.amount,
+        currency: "INR",
+        status: "active",
+        paymentStartDate: now,
+        paymentEndDate: now + 365 * 24 * 60 * 60 * 1000,
+        nextBillingDate: nextBilling,
+        autoRenew: true,
+        createdAt: now,
+        updatedAt: now,
+        gateway: "payu",
+        payuSubscriptionId: txnid,
+        paymentMethod: payload.mode || "mandate"
+      };
+      transaction.set(db.collection("subscriptions").doc(txnid), subRecord);
+
+      // Set ledger entry
+      const ledgerId = `ledger_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const ledgerRecord: WalletLedgerRecord = {
+        id: ledgerId,
+        userId: txData.userId,
+        type: "credit_renewal",
+        amount: txData.creditsAllocated,
+        previousBalance,
+        newBalance,
+        description: `Subscription renewal credits for ${txData.planName} Plan`,
+        referenceId: txnid,
+        timestamp: now
+      };
+      transaction.set(db.collection("walletLedger").doc(ledgerId), ledgerRecord);
+
+      // Set invoice (GST Compliance)
+      const gstRate = 0.18;
+      const subtotal = txData.amount / (1 + gstRate);
+      const gstAmount = txData.amount - subtotal;
+      const invoiceId = `inv_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const invoiceRecord: InvoiceRecord = {
+        id: invoiceId,
+        userId: txData.userId,
+        subscriptionId: txnid,
+        transactionId: txnid,
+        planName: txData.planName,
+        amount: Number(subtotal.toFixed(2)),
+        gstAmount: Number(gstAmount.toFixed(2)),
+        totalAmount: Number(txData.amount),
+        status: "paid",
+        billingName: payload.firstname || user.displayName || "Readability Scholar",
+        billingEmail: payload.email || user.email || "scholar@readability.ai",
+        billingPhone: payload.phone || "9999999999",
+        timestamp: now
+      };
+      transaction.set(db.collection("invoices").doc(invoiceId), invoiceRecord);
+    });
+  } catch (err) {
+    if (isPermissionError(err)) {
+      useLocalFallback = true;
+      return processPayUSubscriptionSuccess(txnid, payload);
+    }
+    throw err;
+  }
+}
+
+
 

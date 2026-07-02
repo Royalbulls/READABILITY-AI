@@ -13,6 +13,7 @@ import GrowthHubView from "./components/GrowthHubView";
 import BusinessStudioView from "./components/BusinessStudioView";
 import AcademyView from "./components/AcademyView";
 import UniversalSearchView from "./components/UniversalSearchView";
+import ComplianceModal from "./components/ComplianceModal";
 import { InputHistoryItem, SimplificationMode, UserProfile } from "./types";
 import { 
   Upload, 
@@ -55,6 +56,7 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [activeView, setActiveView] = useState<"workspace" | "pricing" | "growth" | "admin" | "business" | "academy" | "search">("workspace");
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [complianceTab, setComplianceTab] = useState<"privacy" | "terms" | "refund" | "contact" | "about" | null>(null);
 
   // Input form states
   const [inputTab, setInputTab] = useState<"simplify" | "search">("simplify");
@@ -104,6 +106,13 @@ export default function App() {
 
   // Load history from localStorage on mount & sync with Firebase on auth changes
   useEffect(() => {
+    // Check URL parameters for direct view routing (e.g., after payment redirect)
+    const urlParams = new URLSearchParams(window.location.search);
+    const viewParam = urlParams.get("view");
+    if (viewParam && ["workspace", "pricing", "growth", "admin", "business", "academy", "search"].includes(viewParam)) {
+      setActiveView(viewParam as any);
+    }
+
     let unsubscribe = () => {};
     
     setIsAuthLoading(true);
@@ -937,10 +946,28 @@ export default function App() {
       )}
 
         {/* Decorative clean footer */}
-        <footer className="border-t border-slate-200 py-6 text-center text-xs font-mono text-slate-400 bg-white mt-auto font-semibold">
+        <footer className="border-t border-slate-200 py-6 text-center text-xs font-mono text-slate-400 bg-white mt-auto font-semibold flex flex-col items-center gap-2">
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">
+            <button onClick={() => setComplianceTab("about")} className="hover:text-indigo-600 transition cursor-pointer">About Us</button>
+            <span>&bull;</span>
+            <button onClick={() => setComplianceTab("privacy")} className="hover:text-indigo-600 transition cursor-pointer">Privacy Policy</button>
+            <span>&bull;</span>
+            <button onClick={() => setComplianceTab("terms")} className="hover:text-indigo-600 transition cursor-pointer">Terms & Conditions</button>
+            <span>&bull;</span>
+            <button onClick={() => setComplianceTab("refund")} className="hover:text-indigo-600 transition cursor-pointer">Refund Policy</button>
+            <span>&bull;</span>
+            <button onClick={() => setComplianceTab("contact")} className="hover:text-indigo-600 transition cursor-pointer">Contact Us</button>
+          </div>
           <p>&copy; {new Date().getFullYear()} READABILITY AI. ALL RIGHTS OF CLARITY PRESERVED.</p>
-          <p className="text-[10px] mt-1 text-slate-400">POWERED BY GEMINI-3.5-FLASH &bull; CORE ENGINE: MR. KILVISH</p>
+          <p className="text-[10px] mt-1 text-slate-400 font-medium">POWERED BY GEMINI-3.5-FLASH &bull; CORE ENGINE: MR. KILVISH</p>
         </footer>
+
+        {complianceTab && (
+          <ComplianceModal 
+            initialTab={complianceTab} 
+            onClose={() => setComplianceTab(null)} 
+          />
+        )}
       </div>
     </div>
   );

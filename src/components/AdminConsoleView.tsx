@@ -203,7 +203,7 @@ export default function AdminConsoleView({ user }: AdminConsoleViewProps) {
         <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm bg-gradient-to-br from-indigo-50/50 to-white">
           <p className="text-[10px] font-mono font-bold text-indigo-500 uppercase tracking-wider">Total Sales Income</p>
           <p className="text-2xl font-display font-bold text-indigo-700 mt-1">₹{totalSalesRevenue}</p>
-          <p className="text-[10px] text-indigo-500 font-mono mt-0.5">Success Cashfree orders</p>
+          <p className="text-[10px] text-indigo-500 font-mono mt-0.5">Success PayU subscriptions</p>
         </div>
       </div>
 

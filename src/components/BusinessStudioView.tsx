@@ -26,15 +26,62 @@ import {
   Copy,
   Info,
   ChevronRight,
-  Plus
+  Plus,
+  ChevronLeft,
+  MapPin,
+  Building2,
+  Wrench,
+  Calculator,
+  Gauge,
+  Landmark,
+  User
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+
+const INDIA_STATES_AND_DISTRICTS: Record<string, string[]> = {
+  "Andaman and Nicobar Islands": ["Port Blair", "North and Middle Andaman", "South Andaman", "Nicobar"],
+  "Andhra Pradesh": ["Visakhapatnam", "Vijayawada", "Guntur", "Nellore", "Tirupati", "Kurnool", "Anantapur", "Kakinada", "Kadapa", "Eluru", "Rajamahendravaram", "Vizianagaram"],
+  "Arunachal Pradesh": ["Itanagar", "Tawang", "East Siang", "West Kameng", "Papum Pare", "Changlang", "Lower Subansiri", "Namsai"],
+  "Assam": ["Guwahati", "Dibrugarh", "Silchar", "Jorhat", "Nagaon", "Tinsukia", "Tezpur", "Bongaigaon", "Karimganj", "Sivasagar"],
+  "Bihar": ["Patna", "Gaya", "Bhagalpur", "Muzaffarpur", "Purnia", "Darbhanga", "Arrah", "Begusarai", "Katihar", "Munger", "Nalanda", "Rohtas"],
+  "Chandigarh": ["Chandigarh"],
+  "Chhattisgarh": ["Raipur", "Bhilai", "Bilaspur", "Korba", "Rajnandgaon", "Jagdalpur", "Raigarh", "Durg", "Ambikapur"],
+  "Dadra and Nagar Haveli and Daman and Diu": ["Daman", "Diu", "Dadra and Nagar Haveli"],
+  "Delhi": ["New Delhi", "South Delhi", "North Delhi", "East Delhi", "West Delhi", "Central Delhi", "Dwarka", "Rohini"],
+  "Goa": ["North Goa", "South Goa", "Panaji", "Margao", "Vasco da Gama", "Mapusa"],
+  "Gujarat": ["Ahmedabad", "Surat", "Vadodara", "Rajkot", "Bhavnagar", "Jamnagar", "Gandhinagar", "Junagadh", "Anand", "Navsari", "Morbi", "Bharuch", "Mehsana", "Valsad"],
+  "Haryana": ["Gurugram", "Faridabad", "Panipat", "Ambala", "Yamunanagar", "Rohtak", "Hisar", "Karnal", "Sonipat", "Panchkula", "Kurukshetra"],
+  "Himachal Pradesh": ["Shimla", "Dharamshala", "Solan", "Mandi", "Kullu", "Chamba", "Hamirpur", "Una", "Kangra", "Bilaspur"],
+  "Jammu and Kashmir": ["Srinagar", "Jammu", "Anantnag", "Baramulla", "Kathua", "Samba", "Udhampur", "Pulwama", "Kupwara"],
+  "Jharkhand": ["Ranchi", "Jamshedpur", "Dhanbad", "Bokaro", "Deoghar", "Hazaribagh", "Giridih", "Ramgarh", "Palamu"],
+  "Karnataka": ["Bengaluru", "Mysuru", "Hubballi-Dharwad", "Mangaluru", "Belagavi", "Davangere", "Ballari", "Vijayapura", "Kalaburagi", "Shivamogga", "Tumakuru", "Udupi"],
+  "Kerala": ["Thiruvananthapuram", "Kochi", "Kozhikode", "Thrissur", "Kollam", "Alappuzha", "Palakkad", "Kottayam", "Kannur", "Malappuram", "Wayanad", "Idukki"],
+  "Ladakh": ["Leh", "Kargil"],
+  "Lakshadweep": ["Kavaratti", "Agatti", "Minicoy", "Amini"],
+  "Madhya Pradesh": ["Bhopal", "Indore", "Jabalpur", "Gwalior", "Ujjain", "Sagar", "Dewas", "Satna", "Ratlam", "Rewa", "Chhindwara", "Singrauli", "Katni", "Khandwa", "Morena"],
+  "Maharashtra": ["Mumbai", "Pune", "Nagpur", "Thane", "Pimpri-Chinchwad", "Nashik", "Kalyan-Dombivli", "Vasai-Virar", "Aurangabad", "Navi Mumbai", "Solapur", "Mira-Bhayandar", "Amravati", "Kolhapur", "Sangli", "Jalgaon", "Akola", "Nanded"],
+  "Manipur": ["Imphal East", "Imphal West", "Thoubal", "Bishnupur", "Churachandpur", "Senapati", "Ukhrul"],
+  "Meghalaya": ["Shillong", "Tura", "Jowai", "Nongpoh", "Williamnagar"],
+  "Mizoram": ["Aizawl", "Lunglei", "Saiha", "Champhai", "Kolasib"],
+  "Nagaland": ["Dimapur", "Kohima", "Mokokchung", "Tuensang", "Wokha"],
+  "Odisha": ["Bhubaneswar", "Cuttack", "Rourkela", "Berhampur", "Sambalpur", "Puri", "Balasore", "Bhadrak", "Baripada", "Jharsuguda"],
+  "Puducherry": ["Puducherry", "Karaikal", "Mahe", "Yanam"],
+  "Punjab": ["Ludhiana", "Amritsar", "Jalandhar", "Patiala", "Bathinda", "Mohali", "Hoshiarpur", "Pathankot", "Moga", "Abohar"],
+  "Rajasthan": ["Jaipur", "Jodhpur", "Kota", "Bikaner", "Ajmer", "Udaipur", "Bhilwara", "Alwar", "Sikar", "Sri Ganganagar", "Bharatpur", "Barmer", "Pali"],
+  "Sikkim": ["Gangtok", "Namchi", "Mangan", "Gyalshing"],
+  "Tamil Nadu": ["Chennai", "Coimbatore", "Madurai", "Tiruchirappalli", "Salem", "Tirunelveli", "Tiruppur", "Vellore", "Erode", "Thoothukudi", "Nagercoil", "Thanjavur", "Kanchipuram"],
+  "Telangana": ["Hyderabad", "Warangal", "Nizamabad", "Karimnagar", "Khammam", "Ramagundam", "Mahbubnagar", "Nalgonda", "Adilabad"],
+  "Tripura": ["Agartala", "Dharmanagar", "Udaipur", "Kailasahar", "Ambassa"],
+  "Uttar Pradesh": ["Lucknow", "Kanpur", "Ghaziabad", "Agra", "Meerut", "Varanasi", "Prayagraj", "Bareilly", "Aligarh", "Moradabad", "Saharanpur", "Gorakhpur", "Noida", "Greater Noida", "Jhansi", "Muzaffarnagar", "Mathura", "Ayodhya", "Firozabad"],
+  "Uttarakhand": ["Dehradun", "Haridwar", "Haldwani", "Rudrapur", "Roorkee", "Kashipur", "Rishikesh", "Nainital", "Almora"],
+  "West Bengal": ["Kolkata", "Howrah", "Darjeeling", "Siliguri", "Asansol", "Durgapur", "Kharagpur", "Bardhaman", "Malda", "Baharampur", "Jalpaiguri", "Haldia"]
+};
 
 interface BusinessStudioViewProps {
   user: any;
   userProfile: any;
   onRefreshProfile: () => void;
-  setActiveView: (view: "workspace" | "pricing" | "growth" | "admin" | "business") => void;
+  setActiveView: (view: "workspace" | "pricing" | "growth" | "admin" | "business" | "academy" | "search") => void;
 }
 
 export default function BusinessStudioView({ 
@@ -53,9 +100,90 @@ export default function BusinessStudioView({
   const [fileName, setFileName] = useState<string>("");
 
   // Personalized Inputs
-  const [companyName, setCompanyName] = useState<string>("My Company Enterprise");
-  const [stateName, setStateName] = useState<string>("Maharashtra");
+  const [companyName, setCompanyName] = useState<string>("Clarity Meadows Organic Dairy");
+  const [stateName, setStateName] = useState<string>("Madhya Pradesh");
   const [budgetAmount, setBudgetAmount] = useState<number>(1500000);
+
+  // Multi-step Wizard States
+  const [currentStep, setCurrentStep] = useState<number>(1);
+  const [applicantName, setApplicantName] = useState<string>("Ramesh Sharma");
+  const [applicantFatherHusband, setApplicantFatherHusband] = useState<string>("Suresh Sharma");
+  const [applicantDob, setApplicantDob] = useState<string>("1990-05-15");
+  const [applicantGender, setApplicantGender] = useState<string>("Male");
+  const [applicantMobile, setApplicantMobile] = useState<string>("9876543210");
+  const [applicantEmail, setApplicantEmail] = useState<string>("ramesh.sharma@example.com");
+  const [applicantAadhaar, setApplicantAadhaar] = useState<string>("1234-5678-9012");
+  const [applicantPan, setApplicantPan] = useState<string>("ABCDE1234F");
+  const [applicantAddress, setApplicantAddress] = useState<string>("102, Shanti Nagar");
+  const [applicantCountry, setApplicantCountry] = useState<string>("India");
+  const [applicantState, setApplicantState] = useState<string>("Madhya Pradesh");
+  const [applicantDistrict, setApplicantDistrict] = useState<string>("Bhopal");
+  const [applicantTehsil, setApplicantTehsil] = useState<string>("Huzur");
+  const [applicantCity, setApplicantCity] = useState<string>("Bhopal");
+  const [applicantVillage, setApplicantVillage] = useState<string>("Kolar");
+  const [applicantPinCode, setApplicantPinCode] = useState<string>("462001");
+
+  // Advanced CA-Level Business Profiling States
+  const [promoterProfile, setPromoterProfile] = useState<string>("Experienced entrepreneur with a strong background in dairy management and regional logistics.");
+  const [coFoundersDetails, setCoFoundersDetails] = useState<string>("Amit Verma (MBA - Operations, 8 years corporate retail dairy supply experience).");
+  const [directorsPartners, setDirectorsPartners] = useState<string>("Ramesh Sharma (Director, DIN: 09876543), Amit Verma (Director, DIN: 09876544)");
+  const [shareholdingPattern, setShareholdingPattern] = useState<string>("Ramesh Sharma: 65%, Amit Verma: 35%");
+  const [gstNumber, setGstNumber] = useState<string>("23ABCDE1234F1Z5");
+  const [udyamRegistration, setUdyamRegistration] = useState<string>("UDYAM-MP-03-0012345");
+  const [cinNumber, setCinNumber] = useState<string>("U01111MP2023PTC123456");
+  const [iecNumber, setIecNumber] = useState<string>("0312345678");
+  const [bankAccountNo, setBankAccountNo] = useState<string>("912010045678912");
+  const [bankIfsc, setBankIfsc] = useState<string>("UTIB0000043");
+  const [bankName, setBankName] = useState<string>("Axis Bank");
+  const [bankBranch, setBankBranch] = useState<string>("Bhopal Main Branch");
+  const [existingLoans, setExistingLoans] = useState<string>("None");
+  const [cibilScore, setCibilScore] = useState<string>("765 (Excellent)");
+  const [netWorth, setNetWorth] = useState<number>(2500000);
+  const [personalAssets, setPersonalAssets] = useState<string>("Residential Flat in Bhopal (₹45L), Mutual Funds (₹8L)");
+  const [personalLiabilities, setPersonalLiabilities] = useState<string>("Car Loan (Outstanding ₹2.5L)");
+  const [businessExperience, setBusinessExperience] = useState<number>(7);
+  const [educationQualification, setEducationQualification] = useState<string>("B.Tech in Biotechnology, Diploma in Agribusiness");
+  const [nomineeName, setNomineeName] = useState<string>("Sunita Sharma");
+  const [nomineeRelationship, setNomineeRelationship] = useState<string>("Spouse");
+  const [nomineeAge, setNomineeAge] = useState<number>(32);
+  const [guarantorName, setGuarantorName] = useState<string>("Suresh Sharma");
+  const [guarantorNetWorth, setGuarantorNetWorth] = useState<number>(5000000);
+  const [guarantorPan, setGuarantorPan] = useState<string>("ABCDE9876G");
+
+  // Step 2: Business Profile
+  const [businessType, setBusinessType] = useState<string>("Private Limited");
+  const [businessCategory, setBusinessCategory] = useState<string>("Agriculture");
+  const [businessStage, setBusinessStage] = useState<string>("Startup");
+
+  // Step 3: Project Information
+  const [projectName, setProjectName] = useState<string>("High-Yield Eco-Dairy Hub");
+  const [projectLocation, setProjectLocation] = useState<string>("Govindpura Industrial Area");
+  const [landOwnedRented, setLandOwnedRented] = useState<string>("Owned");
+  const [buildingType, setBuildingType] = useState<string>("Shed/Factory Area");
+  const [machineryDetails, setMachineryDetails] = useState<string>("Automated Milking & Pasteurization System");
+  const [rawMaterialsDetails, setRawMaterialsDetails] = useState<string>("High-yield cattle feed, medical supplies");
+  const [productionCapacity, setProductionCapacity] = useState<string>("1000 Litres Daily");
+  const [employeesCount, setEmployeesCount] = useState<number>(8);
+  const [electricityNeeds, setElectricityNeeds] = useState<string>("3-Phase Power (30 HP)");
+  const [waterNeeds, setWaterNeeds] = useState<string>("Borewell & Filtration");
+  const [internetNeeds, setInternetNeeds] = useState<string>("Broadband WiFi");
+  const [timelineMonths, setTimelineMonths] = useState<number>(6);
+
+  // Step 4: Financial Projections
+  const [ownInvestment, setOwnInvestment] = useState<number>(450000);
+  const [loanRequirement, setLoanRequirement] = useState<number>(1050000);
+  const [workingCapital, setWorkingCapital] = useState<number>(200000);
+  const [monthlyExpenses, setMonthlyExpenses] = useState<number>(120000);
+  const [projectedAnnualRevenue, setProjectedAnnualRevenue] = useState<number>(2800000);
+  const [loanInterestRate, setLoanInterestRate] = useState<number>(9.5);
+  const [loanTenureYears, setLoanTenureYears] = useState<number>(5);
+
+  // Step 5: Document Checklist
+  const [checkedDocs, setCheckedDocs] = useState<string[]>([
+    "PAN Card of Applicant",
+    "Aadhaar Card of Applicant",
+    "Passport Size Photo"
+  ]);
 
   // System States
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -97,6 +225,102 @@ export default function BusinessStudioView({
 
   // File Upload Reference
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const calculateLoanDetails = () => {
+    const P = loanRequirement;
+    const r = (loanInterestRate / 12) / 100;
+    const n = loanTenureYears * 12;
+    
+    let monthlyEmi = 0;
+    if (r > 0) {
+      monthlyEmi = Math.round((P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1));
+    } else {
+      monthlyEmi = Math.round(P / n);
+    }
+    
+    const totalPayments = monthlyEmi * n;
+    const totalInterest = Math.max(0, totalPayments - P);
+    
+    const annualExpenses = monthlyExpenses * 12;
+    const estimatedNetProfit = projectedAnnualRevenue - annualExpenses;
+    const annualDebtService = monthlyEmi * 12;
+    
+    let dscr = 1.0;
+    if (annualDebtService > 0) {
+      dscr = Math.round((estimatedNetProfit / annualDebtService) * 100) / 100;
+    } else {
+      dscr = 2.5;
+    }
+    
+    return {
+      monthlyEmi,
+      totalInterest,
+      estimatedNetProfit,
+      dscr: dscr <= 0 ? 0.1 : dscr
+    };
+  };
+
+  const getMissingDocuments = () => {
+    const required = [
+      "PAN Card of Applicant",
+      "Aadhaar Card of Applicant",
+      "Passport Size Photo",
+      "MSME Udyam Registration Certificate"
+    ];
+    return required.filter(doc => !checkedDocs.includes(doc));
+  };
+
+  const matchGovernmentSchemes = () => {
+    const matched = [];
+    
+    if (applicantState.toLowerCase().includes("madhya pradesh") || applicantState.toLowerCase().includes("mp")) {
+      matched.push({
+        type: "Madhya Pradesh State Scheme",
+        name: "Mukhyamantri Udhyami Kranti Yojana (MMUKY)",
+        eligibility: "MP Domicile, Age 18-40, Minimum 8th Class Pass. Project outlay up to ₹50 Lakhs.",
+        benefits: "3% Interest Subvention per annum + collateral free guarantee covered by State Government."
+      });
+    }
+
+    if (loanRequirement <= 1000000) {
+      let segment = "Shishu";
+      if (loanRequirement > 50000 && loanRequirement <= 500000) segment = "Kishor";
+      else if (loanRequirement > 500000) segment = "Tarun";
+      matched.push({
+        type: "Central Govt Scheme",
+        name: `Pradhan Mantri MUDRA Yojana (PMMY) - [${segment} Category]`,
+        eligibility: "All micro-enterprises, retail traders, service providers, and agricultural allied sectors.",
+        benefits: `Collateral-free credit of ₹${loanRequirement.toLocaleString()} with standard commercial rate interest capping.`
+      });
+    }
+
+    if (businessStage === "Startup" || businessStage === "Idea") {
+      matched.push({
+        type: "Central Govt Subsidized Scheme",
+        name: "Prime Minister's Employment Generation Programme (PMEGP)",
+        eligibility: "Greenfield projects in Manufacturing (up to ₹50 Lakhs) and Services (up to ₹20 Lakhs).",
+        benefits: "15% to 35% Capital Subsidy on project cost from KVIC/DIC depending on rural/urban location."
+      });
+    }
+
+    if (businessCategory.toLowerCase().includes("agriculture") || businessCategory.toLowerCase().includes("dairy")) {
+      matched.push({
+        type: "Ministry of Food Processing",
+        name: "PM Formalisation of Micro Food Processing Enterprises (PMFME)",
+        eligibility: "Individual micro food processing enterprises, self-help groups, and cooperatives.",
+        benefits: "Credit-linked capital subsidy of 35% of the eligible project cost (maximum of ₹10 Lakhs)."
+      });
+    }
+
+    matched.push({
+      type: "Credit Guarantee Trust",
+      name: "Credit Guarantee Fund Trust for Micro and Small Enterprises (CGTMSE)",
+      eligibility: "New and existing Micro and Small Enterprises carrying out service or manufacturing activity.",
+      benefits: "Collateral-free credit facilities up to ₹5 Crore covered entirely by the CGTMSE trust guarantee."
+    });
+
+    return matched;
+  };
 
   // Industry examples
   const INDUSTRIES = [
@@ -164,9 +388,9 @@ export default function BusinessStudioView({
 
   // Generate Report Call
   const handleGenerateReport = async (smartSearchQuery?: string) => {
-    const finalTopic = smartSearchQuery || topic;
+    const finalTopic = smartSearchQuery || topic || projectName;
     if (!finalTopic.trim()) {
-      setError("Please specify a topic, business name, or query to generate your report.");
+      setError("Please specify a topic, business or project name, or query to generate your report.");
       return;
     }
 
@@ -175,18 +399,99 @@ export default function BusinessStudioView({
     setReport(null);
     setSuccessMsg("");
 
+    // Synchronize global fallback properties
+    const activeCompanyName = projectName.trim() || companyName.trim() || "My Company Enterprise";
+    const activeStateName = applicantState || stateName;
+
     try {
       const token = await user.getIdToken();
       const payload = {
         topic: finalTopic.trim(),
         inputType: smartSearchQuery ? "smart_search" : inputType,
-        industry,
+        industry: businessCategory,
         budget,
         currency,
         uploadedText: uploadedText || undefined,
-        companyName: companyName.trim(),
-        stateName: stateName.trim(),
-        budgetAmount: Number(budgetAmount)
+        companyName: activeCompanyName,
+        stateName: activeStateName,
+        budgetAmount: Number(budgetAmount),
+        applicantProfile: {
+          fullName: applicantName,
+          fatherHusbandName: applicantFatherHusband,
+          dob: applicantDob,
+          gender: applicantGender,
+          mobile: applicantMobile,
+          email: applicantEmail,
+          aadhaar: applicantAadhaar,
+          pan: applicantPan,
+          address: applicantAddress,
+          country: applicantCountry,
+          state: applicantState,
+          district: applicantDistrict,
+          tehsil: applicantTehsil,
+          city: applicantCity,
+          village: applicantVillage,
+          pinCode: applicantPinCode,
+          educationQualification,
+          businessExperience,
+          netWorth,
+          personalAssets,
+          personalLiabilities,
+          nominee: {
+            name: nomineeName,
+            relationship: nomineeRelationship,
+            age: nomineeAge
+          }
+        },
+        businessProfile: {
+          businessType,
+          businessStage,
+          promoterProfile,
+          coFoundersDetails,
+          directorsPartners,
+          shareholdingPattern,
+          gstNumber,
+          udyamRegistration,
+          cinNumber,
+          iecNumber,
+          bankDetails: {
+            accountNo: bankAccountNo,
+            ifsc: bankIfsc,
+            bankName,
+            branch: bankBranch
+          },
+          existingLoans,
+          cibilScore,
+          guarantor: {
+            name: guarantorName,
+            netWorth: guarantorNetWorth,
+            pan: guarantorPan
+          }
+        },
+        projectInformation: {
+          projectName,
+          projectLocation,
+          landOwnedRented,
+          buildingType,
+          machineryDetails,
+          rawMaterialsDetails,
+          productionCapacity,
+          employeesCount,
+          electricityNeeds,
+          waterNeeds,
+          internetNeeds,
+          timelineMonths
+        },
+        financialPlan: {
+          ownInvestment,
+          loanRequirement,
+          workingCapital,
+          monthlyExpenses,
+          projectedAnnualRevenue,
+          loanInterestRate,
+          loanTenureYears
+        },
+        missingDocuments: checkedDocs
       };
 
       const res = await fetch("/api/business/generate", {
@@ -282,6 +587,45 @@ export default function BusinessStudioView({
         return `### Human Resources Plan\n${report.operationalPlan?.humanResources || ""}\n\n### Technology Stack\n${report.operationalPlan?.technologyStack || ""}`;
       case "legal":
         return `### Legal Requirements & Required Licenses\n\n${(report.legalRequirements?.licenses || []).map((l: string) => `- **${l}**`).join("\n")}\n\n### GST & Taxation Context\n${report.legalRequirements?.gst || ""}\n\n### MSME Registry Information\n${report.legalRequirements?.msme || ""}\n\n### Startup India Support\n${report.legalRequirements?.startupIndia || ""}\n\n### Applicable Government Schemes\n${report.legalRequirements?.governmentSchemes || ""}`;
+      case "caReview":
+        const ca = report.caReview || {
+          taxSuggestions: "No tax planning notes generated.",
+          gstSuggestions: "No GST advice generated.",
+          complianceReview: "No compliance milestones generated.",
+          missingDocuments: [],
+          riskRating: "Medium",
+          bankReadinessScore: 80,
+          investorReadinessScore: 75
+        };
+        return `### 🏛️ Professional CA Audit & Regulatory Review
+        
+#### 📊 Institutional Readiness Scores
+* **Bank Loan Readiness Score**: **${ca.bankReadinessScore || 80}/100**
+* **Investor Capital Readiness Score**: **${ca.investorReadinessScore || 75}/100**
+* **Inherent Venture Risk Rating**: **${ca.riskRating || "Medium"}**
+
+---
+
+${ca.taxSuggestions || ""}
+
+---
+
+${ca.gstSuggestions || ""}
+
+---
+
+${ca.complianceReview || ""}
+
+---
+
+#### 📁 Missing & Highly Recommended Bankable Documents
+${(ca.missingDocuments || []).length > 0 
+  ? (ca.missingDocuments || []).map((d: string) => `* ⚠️ **${d}** (Procure to upgrade to full Bank DPR status)`).join("\n")
+  : "*All critical applicant and legal documents are marked as complete. Excellent bank readiness!*"}
+
+---
+
+*This audit report has been formulated under standard Indian accounting rules (Tax Act 1961, GST Act 2017) and MSME guidelines. Consult a licensed Chartered Accountant before final filing.*`;
       case "financial":
         return `### Revenue Forecast & Projections\n${report.financialProjection?.revenueForecast || ""}\n\n### Expense Forecast\n${report.financialProjection?.expenseForecast || ""}\n\n### Break-even Analysis\n${report.financialProjection?.breakEvenAnalysis || ""}\n\n### Cash Flow & Balance Sheet Notes\n${report.financialProjection?.cashFlow || ""}\n\n### Profit & Loss Structure\n${report.financialProjection?.profitLoss || ""}`;
       case "dpr":
@@ -709,9 +1053,15 @@ export default function BusinessStudioView({
         <div className="absolute right-0 top-0 w-80 h-80 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-[10px] font-mono font-bold rounded-full uppercase tracking-widest">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-              Business Studio Core v3.0
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-[10px] font-mono font-bold rounded-full uppercase tracking-widest">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                Business Studio Core v3.0
+              </div>
+              <div className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-500/20 border border-amber-400/30 text-amber-200 text-[10px] font-mono font-bold rounded-full uppercase tracking-widest">
+                <Sparkles className="w-3 h-3 text-amber-400" />
+                Prototype Preview
+              </div>
             </div>
             <h1 className="font-display font-bold text-2xl md:text-3xl tracking-tight leading-tight">
               AI Business & Project Report Studio
@@ -730,240 +1080,1394 @@ export default function BusinessStudioView({
       </div>
 
       {/* Generator Form panel */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
-        <div className="border-b border-slate-100 pb-4 mb-6">
-          <h2 className="font-display font-bold text-base text-slate-800 flex items-center gap-2">
-            <span className="w-2 h-4 bg-indigo-600 rounded-full" />
-            Report Parameters
-          </h2>
-          <p className="text-slate-400 text-xs mt-1">Configure your business scenario to feed the Kilvish Intelligence Core</p>
+      <div id="ai-business-studio-wizard" className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-md">
+        
+        {/* Dynamic Header */}
+        <div className="border-b border-slate-100 pb-5 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="font-display font-bold text-lg text-slate-800 flex items-center gap-2">
+              <span className="w-2.5 h-5 bg-indigo-600 rounded-full" />
+              Sovereign Business Studio & Project DPR Wizard
+            </h2>
+            <p className="text-slate-400 text-xs mt-1">Submit applicant demographics and project details to compile bankable plans.</p>
+          </div>
+          <div className="flex items-center gap-2 bg-slate-50 px-3.5 py-1.5 rounded-xl border border-slate-100 font-mono text-[11px] font-bold text-slate-600">
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping" />
+            Live Banking Amortization Core Active
+          </div>
         </div>
 
         {error && (
-          <div className="mb-6 flex items-start gap-3 p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs">
+          <div className="mb-6 flex items-start gap-3 p-4 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs animate-shake">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold">STUDIO ERROR:</span> {error}
+              <span className="font-bold">STUDIO PROTOCOL ALERT:</span> {error}
             </div>
           </div>
         )}
 
         {successMsg && (
-          <div className="mb-6 flex items-start gap-3 p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs">
+          <div className="mb-6 flex items-start gap-3 p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-xs animate-fadeIn">
             <CheckCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <div>{successMsg}</div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-          {/* Inputs Section */}
-          <div className="md:col-span-8 flex flex-col gap-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Input Scenario Type</label>
-                <select
-                  value={inputType}
-                  onChange={(e) => setInputType(e.target.value)}
-                  className="bg-slate-50 text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:bg-white"
-                >
-                  <option value="idea">Business / Startup Idea</option>
-                  <option value="keyword">Core Keyword / Topic</option>
-                  <option value="name">Business / Store Name</option>
-                  <option value="scheme">Government Scheme Match</option>
-                  <option value="product">Product / Service Concept</option>
-                </select>
-              </div>
+        {/* Horizontal Stepper Progress */}
+        <div className="mb-8 overflow-x-auto pb-4">
+          <div className="flex items-center justify-between min-w-[640px] px-2">
+            {[
+              { num: 1, label: "Applicant", desc: "Profile & KYC", icon: User },
+              { num: 2, label: "Business", desc: "Type & Category", icon: Building2 },
+              { num: 3, label: "Project", desc: "Operations & Labour", icon: Wrench },
+              { num: 4, label: "Finances", desc: "Live Calculator", icon: Calculator },
+              { num: 5, label: "Sovereign Schemes", desc: "Eligibility Match", icon: Landmark },
+              { num: 6, label: "Sanity Pre-flight", desc: "Launch Cockpit", icon: Gauge }
+            ].map((step, idx) => {
+              const IconComp = step.icon;
+              const isActive = currentStep === step.num;
+              const isCompleted = currentStep > step.num;
+              return (
+                <div key={step.num} className="flex-1 flex items-center relative">
+                  {/* Line Connector */}
+                  {idx > 0 && (
+                    <div className={`absolute left-0 right-1/2 top-5 h-0.5 -translate-y-1/2 -z-10 ${
+                      currentStep >= step.num ? "bg-indigo-600" : "bg-slate-100"
+                    }`} />
+                  )}
+                  {idx < 5 && (
+                    <div className={`absolute left-1/2 right-0 top-5 h-0.5 -translate-y-1/2 -z-10 ${
+                      currentStep > step.num ? "bg-indigo-600" : "bg-slate-100"
+                    }`} />
+                  )}
 
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Industry Domain</label>
-                <select
-                  value={industry}
-                  onChange={(e) => setIndustry(e.target.value)}
-                  className="bg-slate-50 text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:bg-white"
-                >
-                  {INDUSTRIES.map(ind => (
-                    <option key={ind} value={ind}>{ind}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono font-bold text-slate-500 uppercase flex items-center justify-between">
-                <span>Core Business Statement / Name / Scheme Prompt</span>
-                <span className="text-slate-400 font-sans font-normal text-[10px]">[e.g. Organic Dairy Farm, AI Legal Bot]</span>
-              </label>
-              <input
-                type="text"
-                placeholder="e.g., Open a dairy farm with 50 cows and automated milking systems"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                className="bg-slate-50 text-xs text-slate-800 p-3 rounded-xl border border-slate-200 focus:outline-none focus:bg-white focus:border-indigo-400 transition-all font-medium"
-              />
-            </div>
-
-            {/* Personalized Fields */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Venture Name / Company Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g., Clarity Meadows Organic Dairy"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                  className="bg-slate-50 text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:bg-white focus:border-indigo-400 transition-all font-medium"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Target State / Region</label>
-                <select
-                  value={stateName}
-                  onChange={(e) => setStateName(e.target.value)}
-                  className="bg-slate-50 text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:bg-white"
-                >
-                  <option value="Maharashtra">Maharashtra</option>
-                  <option value="Delhi">Delhi</option>
-                  <option value="Karnataka">Karnataka</option>
-                  <option value="Gujarat">Gujarat</option>
-                  <option value="Tamil Nadu">Tamil Nadu</option>
-                  <option value="Uttar Pradesh">Uttar Pradesh</option>
-                  <option value="Rajasthan">Rajasthan</option>
-                  <option value="Haryana">Haryana</option>
-                  <option value="Punjab">Punjab</option>
-                  <option value="West Bengal">West Bengal</option>
-                  <option value="Telangana">Telangana</option>
-                  <option value="Other">Other Region / Global</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Drag & Drop File Upload */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Context Document Attachment (Optional)</label>
-              <div 
-                onDragOver={handleDragOver}
-                onDrop={handleDrop}
-                onClick={triggerFileInput}
-                className={`border-2 border-dashed rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer transition-all ${
-                  fileName ? "border-emerald-400 bg-emerald-50/20" : "border-slate-200 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300"
-                }`}
-              >
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  onChange={handleFileChange} 
-                  accept=".txt,.md,.csv,.json"
-                  className="hidden" 
-                />
-                {fileName ? (
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-emerald-500" />
-                    <span className="text-xs font-semibold text-emerald-700">{fileName}</span>
-                    <button 
-                      type="button" 
-                      onClick={(e) => { e.stopPropagation(); handleClearFile(); }}
-                      className="text-xs text-rose-500 hover:text-rose-700 font-bold ml-2 underline"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                ) : (
-                  <div className="text-center space-y-1">
-                    <Download className="w-6 h-6 text-slate-400 mx-auto" />
-                    <p className="text-xs font-medium text-slate-600">Drag & drop or Click to upload supporting document context</p>
-                    <p className="text-[10px] text-slate-400 font-mono">Supports Text, Markdown (.txt, .md, .csv)</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Pricing / Budget Settings */}
-          <div className="md:col-span-4 bg-slate-50 rounded-xl p-5 border border-slate-100 flex flex-col gap-4">
-            <h3 className="font-mono text-xs font-bold uppercase text-slate-500 flex items-center gap-1.5 border-b border-slate-200/60 pb-2">
-              <Briefcase className="w-4 h-4 text-indigo-600" />
-              Financial & Currency Base
-            </h3>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-mono font-bold text-slate-500">Target Budget Tier</label>
-              <select
-                value={budget}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setBudget(val);
-                  if (val.includes("Micro")) setBudgetAmount(300000);
-                  else if (val.includes("Small")) setBudgetAmount(1500000);
-                  else if (val.includes("Medium")) setBudgetAmount(8000000);
-                  else if (val.includes("Large")) setBudgetAmount(35000000);
-                }}
-                className="bg-white text-xs text-slate-800 p-2 rounded-lg border border-slate-200 focus:outline-none"
-              >
-                <option value="Micro (Under ₹5 Lakhs)">Micro (Under ₹5 Lakhs)</option>
-                <option value="Small (₹5-50 Lakhs)">Small (₹5-50 Lakhs)</option>
-                <option value="Medium (₹50 Lakhs - 2 Crore)">Medium (₹50 Lakhs - 2 Crore)</option>
-                <option value="Large (Above ₹2 Crore)">Large (Above ₹2 Crore)</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-mono font-bold text-slate-500 flex justify-between">
-                <span>Custom Budget Amount</span>
-                <span className="text-slate-400 font-sans normal-case text-[10px]">Adjustable</span>
-              </label>
-              <input
-                type="number"
-                value={budgetAmount}
-                onChange={(e) => setBudgetAmount(Number(e.target.value))}
-                className="bg-white text-xs text-slate-800 p-2 rounded-lg border border-slate-200 focus:outline-none font-medium"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[10px] font-mono font-bold text-slate-500">Primary Currency</label>
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="bg-white text-xs text-slate-800 p-2 rounded-lg border border-slate-200 focus:outline-none"
-              >
-                <option value="INR (₹)">INR (₹) - Indian Rupees</option>
-                <option value="USD ($)">USD ($) - US Dollars</option>
-                <option value="EUR (€)">EUR (€) - Euros</option>
-              </select>
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-slate-200/60 space-y-3">
-              <button
-                type="button"
-                onClick={() => handleGenerateReport()}
-                disabled={isLoading}
-                className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl text-xs tracking-wide transition-all shadow-md disabled:bg-indigo-400 cursor-pointer"
-              >
-                {isLoading ? (
-                  <>
-                    <Clock className="w-4 h-4 animate-spin" />
-                    <span>Analyzing & Building Report...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    <span>Generate Project Report</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleGenerateReport(`Open a ${topic || "dairy farm"}`)}
-                disabled={isLoading}
-                className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold py-2.5 px-4 rounded-xl text-[11px] transition-all"
-              >
-                🔍 Smart Search & Build
-              </button>
-            </div>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep(step.num)}
+                    className="flex flex-col items-center mx-auto focus:outline-none cursor-pointer group"
+                  >
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
+                      isActive 
+                        ? "bg-indigo-600 border-indigo-600 text-white shadow-md scale-110" 
+                        : isCompleted 
+                          ? "bg-emerald-50 border-emerald-500 text-emerald-600" 
+                          : "bg-white border-slate-200 text-slate-400 group-hover:border-slate-300"
+                    }`}>
+                      {isCompleted ? <Check className="w-5 h-5" /> : <IconComp className="w-4 h-4" />}
+                    </div>
+                    <span className={`text-[11px] font-bold mt-2 ${isActive ? "text-indigo-600" : "text-slate-500"}`}>
+                      {step.label}
+                    </span>
+                    <span className="text-[9px] text-slate-400 font-medium">{step.desc}</span>
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
+
+        {/* Wizard Steps Wrapper */}
+        <div className="bg-slate-50/40 rounded-2xl p-5 md:p-6 border border-slate-100 mb-6">
+          
+          {/* STEP 1: APPLICANT PROFILE */}
+          {currentStep === 1 && (
+            <div className="space-y-8 animate-fadeIn">
+              
+              {/* Header */}
+              <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                    <User className="w-4 h-4 text-indigo-600" />
+                    Enterprise-Grade Applicant Domicile & Professional Profile
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Provide legal identification, address hierarchy, and promoter financial parameters.</p>
+                </div>
+                <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono font-bold uppercase">Step 1 of 6</span>
+              </div>
+
+              {/* Sub-Section 1: Personal KYC & Contact */}
+              <div className="space-y-4">
+                <h4 className="text-[11px] font-mono font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1">
+                  👤 1. Primary Applicant & KYC Domicile
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Full Name <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="text"
+                      value={applicantName}
+                      onChange={(e) => setApplicantName(e.target.value)}
+                      placeholder="Ramesh Sharma"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Father/Husband Name <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="text"
+                      value={applicantFatherHusband}
+                      onChange={(e) => setApplicantFatherHusband(e.target.value)}
+                      placeholder="Suresh Sharma"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Date of Birth & Gender <span className="text-indigo-600 font-bold">*</span></label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="date"
+                        value={applicantDob}
+                        onChange={(e) => setApplicantDob(e.target.value)}
+                        className="bg-white text-xs text-slate-800 p-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                      />
+                      <select
+                        value={applicantGender}
+                        onChange={(e) => setApplicantGender(e.target.value)}
+                        className="bg-white text-xs text-slate-800 p-2 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                      >
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Third Gender">Third Gender</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Mobile Number <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="tel"
+                      value={applicantMobile}
+                      onChange={(e) => setApplicantMobile(e.target.value)}
+                      placeholder="9876543210"
+                      maxLength={10}
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Email Address</label>
+                    <input
+                      type="email"
+                      value={applicantEmail}
+                      onChange={(e) => setApplicantEmail(e.target.value)}
+                      placeholder="ramesh@example.com"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Aadhaar Card <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="text"
+                      value={applicantAadhaar}
+                      onChange={(e) => setApplicantAadhaar(e.target.value)}
+                      placeholder="1234-5678-9012"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">PAN Card <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="text"
+                      value={applicantPan}
+                      onChange={(e) => setApplicantPan(e.target.value.toUpperCase())}
+                      placeholder="ABCDE1234F"
+                      maxLength={10}
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono uppercase font-bold"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Sub-Section 2: Complete India Cascading Location System */}
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+                <h4 className="text-[11px] font-mono font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1">
+                  📍 2. Complete India Location Cascading System
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Country</label>
+                    <select
+                      value={applicantCountry}
+                      onChange={(e) => setApplicantCountry(e.target.value)}
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    >
+                      <option value="India">India (Sovereign)</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">State / UT <span className="text-indigo-600 font-bold">*</span></label>
+                    <select
+                      value={applicantState}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setApplicantState(val);
+                        setStateName(val); // Synchronize
+                        // Set first district of selected state
+                        const districts = INDIA_STATES_AND_DISTRICTS[val] || [];
+                        if (districts.length > 0) {
+                          setApplicantDistrict(districts[0]);
+                        } else {
+                          setApplicantDistrict("");
+                        }
+                      }}
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    >
+                      {Object.keys(INDIA_STATES_AND_DISTRICTS).map((st) => (
+                        <option key={st} value={st}>{st}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">District <span className="text-indigo-600 font-bold">*</span></label>
+                    <select
+                      value={applicantDistrict}
+                      onChange={(e) => setApplicantDistrict(e.target.value)}
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    >
+                      {(INDIA_STATES_AND_DISTRICTS[applicantState] || []).map((dt) => (
+                        <option key={dt} value={dt}>{dt}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Block / Tehsil <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="text"
+                      value={applicantTehsil}
+                      onChange={(e) => setApplicantTehsil(e.target.value)}
+                      placeholder="e.g. Huzur Tehsil"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-1.5 md:col-span-2">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Physical Address (House, Block, Road) <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="text"
+                      value={applicantAddress}
+                      onChange={(e) => setApplicantAddress(e.target.value)}
+                      placeholder="e.g. Plot No 24, Sector B, Industrial Area"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Village / City <span className="text-indigo-600 font-bold">*</span></label>
+                      <input
+                        type="text"
+                        value={applicantCity}
+                        onChange={(e) => {
+                          setApplicantCity(e.target.value);
+                          setApplicantVillage(e.target.value);
+                        }}
+                        placeholder="Bhopal / Kolar"
+                        className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">PIN Code <span className="text-indigo-600 font-bold">*</span></label>
+                      <input
+                        type="text"
+                        value={applicantPinCode}
+                        onChange={(e) => setApplicantPinCode(e.target.value)}
+                        placeholder="462001"
+                        maxLength={6}
+                        className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono font-bold text-slate-800"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sub-Section 3: Promoter Professional Credentials */}
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+                <h4 className="text-[11px] font-mono font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1">
+                  🎓 3. Promoter Academic & Industry Credentials
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Education / Qualification <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="text"
+                      value={educationQualification}
+                      onChange={(e) => setEducationQualification(e.target.value)}
+                      placeholder="e.g. M.Sc. Agriculture, B.Tech CSE, CA"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Relevant Industry Experience (Years) <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="number"
+                      value={businessExperience}
+                      onChange={(e) => setBusinessExperience(Number(e.target.value))}
+                      placeholder="e.g. 5"
+                      min={0}
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase flex items-center gap-1">
+                      CIBIL Credit Score
+                      <span className="bg-amber-100 border border-amber-300 text-amber-800 font-mono text-[8px] uppercase px-1 rounded">Optional</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={cibilScore}
+                      onChange={(e) => setCibilScore(e.target.value)}
+                      placeholder="e.g. 785 (Excellent)"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Promoter Profile Brief</label>
+                    <textarea
+                      rows={2}
+                      value={promoterProfile}
+                      onChange={(e) => setPromoterProfile(e.target.value)}
+                      placeholder="Describe the main promoter's professional background, skills, and industry achievements..."
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Co-Founder(s) Profiles</label>
+                    <textarea
+                      rows={2}
+                      value={coFoundersDetails}
+                      onChange={(e) => setCoFoundersDetails(e.target.value)}
+                      placeholder="Name, educational background and experience details of active co-founders..."
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Sub-Section 4: Promoter Financial Registry & Nominee */}
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+                <h4 className="text-[11px] font-mono font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1">
+                  🛡️ 4. Asset-Liability Net Worth & Nominee Registry
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Promoter Personal Net Worth (INR) <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="number"
+                      value={netWorth}
+                      onChange={(e) => setNetWorth(Number(e.target.value))}
+                      placeholder="e.g. 2500000"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Personal Declared Assets</label>
+                    <input
+                      type="text"
+                      value={personalAssets}
+                      onChange={(e) => setPersonalAssets(e.target.value)}
+                      placeholder="e.g. Land property, Gold, Fixed Deposits"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Personal Declared Liabilities</label>
+                    <input
+                      type="text"
+                      value={personalLiabilities}
+                      onChange={(e) => setPersonalLiabilities(e.target.value)}
+                      placeholder="e.g. Ongoing home loan, credit card debts"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Nominee Name <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="text"
+                      value={nomineeName}
+                      onChange={(e) => setNomineeName(e.target.value)}
+                      placeholder="e.g. Sunita Sharma"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Nominee Relationship <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="text"
+                      value={nomineeRelationship}
+                      onChange={(e) => setNomineeRelationship(e.target.value)}
+                      placeholder="e.g. Spouse, Father, Daughter"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Nominee Age <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="number"
+                      value={nomineeAge}
+                      onChange={(e) => setNomineeAge(Number(e.target.value))}
+                      placeholder="e.g. 35"
+                      min={1}
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 2: BUSINESS PROFILE */}
+          {currentStep === 2 && (
+            <div className="space-y-8 animate-fadeIn">
+              
+              {/* Header */}
+              <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                    <Building2 className="w-4 h-4 text-indigo-600" />
+                    Enterprise-Grade Entity Profile & Corporate Registry
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Specify the legal constitution, government ID registry, banking parameters, and guarantor registry.</p>
+                </div>
+                <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono font-bold uppercase">Step 2 of 6</span>
+              </div>
+
+              {/* Sub-Section 1: Constitution & Categorization */}
+              <div className="space-y-4">
+                <h4 className="text-[11px] font-mono font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1">
+                  🏢 1. Legal Constitution & Sector
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Proposed Business / Operating Entity Name <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="text"
+                      value={projectName}
+                      onChange={(e) => {
+                        setProjectName(e.target.value);
+                        setCompanyName(e.target.value);
+                      }}
+                      placeholder="e.g. Clarity Meadows Organic Dairy Hub Private Limited"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-semibold"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Industry Domain / Sector <span className="text-indigo-600 font-bold">*</span></label>
+                    <select
+                      value={businessCategory}
+                      onChange={(e) => {
+                        setBusinessCategory(e.target.value);
+                        setIndustry(e.target.value);
+                      }}
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    >
+                      {INDUSTRIES.map(ind => (
+                        <option key={ind} value={ind}>{ind}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Legal Constitution of Business <span className="text-indigo-600 font-bold">*</span></label>
+                    <select
+                      value={businessType}
+                      onChange={(e) => setBusinessType(e.target.value)}
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    >
+                      <option value="Proprietorship">Individual Proprietorship / Proprietor</option>
+                      <option value="Partnership">Partnership Firm (Registered)</option>
+                      <option value="Private Limited">Private Limited Company</option>
+                      <option value="LLP">Limited Liability Partnership (LLP)</option>
+                      <option value="OPC">One Person Company (OPC)</option>
+                      <option value="NGO">Non-Governmental Organization (NGO)</option>
+                      <option value="Trust">Charitable Trust</option>
+                      <option value="Cooperative Society">Cooperative Society</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Business Operational Stage <span className="text-indigo-600 font-bold">*</span></label>
+                    <select
+                      value={businessStage}
+                      onChange={(e) => setBusinessStage(e.target.value)}
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    >
+                      <option value="Idea">Idea / Greenfield Concept</option>
+                      <option value="Startup">Startup / Newly Incorporated (&lt; 2 Years)</option>
+                      <option value="Growing">Existing Brownfield Unit (Scaling Operations)</option>
+                      <option value="Mature">Mature Enterprise / Restructuring</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sub-Section 2: Sovereign Business Registrations */}
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+                <h4 className="text-[11px] font-mono font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1">
+                  📁 2. Sovereign Business Registrations & IDs
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase flex items-center gap-1">
+                      GSTIN (GST Number)
+                      <span className="bg-amber-100 text-amber-800 font-mono text-[8px] uppercase px-1 rounded ml-1 scale-95 font-bold">Recommended</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={gstNumber}
+                      onChange={(e) => setGstNumber(e.target.value.toUpperCase())}
+                      placeholder="e.g. 23ABCDE1234F1Z5"
+                      maxLength={15}
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono uppercase font-bold"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase flex items-center gap-1">
+                      MSME Udyam Registration
+                      <span className="bg-amber-100 text-amber-800 font-mono text-[8px] uppercase px-1 rounded ml-1 scale-95 font-bold">Recommended</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={udyamRegistration}
+                      onChange={(e) => setUdyamRegistration(e.target.value.toUpperCase())}
+                      placeholder="UDYAM-XX-00-1234567"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono uppercase font-bold"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Corporate CIN (Company ID)</label>
+                    <input
+                      type="text"
+                      value={cinNumber}
+                      onChange={(e) => setCinNumber(e.target.value.toUpperCase())}
+                      placeholder="U72200MH2022PTC123456"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono uppercase font-bold"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Import Export Code (IEC)</label>
+                    <input
+                      type="text"
+                      value={iecNumber}
+                      onChange={(e) => setIecNumber(e.target.value)}
+                      placeholder="0512345678"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Board Directors / Active Partners List</label>
+                    <input
+                      type="text"
+                      value={directorsPartners}
+                      onChange={(e) => setDirectorsPartners(e.target.value)}
+                      placeholder="Ramesh Sharma (Director, DIN: 09876543), Amit Verma..."
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Shareholding Pattern Description</label>
+                    <input
+                      type="text"
+                      value={shareholdingPattern}
+                      onChange={(e) => setShareholdingPattern(e.target.value)}
+                      placeholder="e.g. Ramesh Sharma (65%), Amit Verma (35%)"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Sub-Section 3: Bank Details & Liabilities */}
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+                <h4 className="text-[11px] font-mono font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1">
+                  🏛️ 3. Bank Account & Outstanding Liabilities Registry
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Primary Bank Name <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="text"
+                      value={bankName}
+                      onChange={(e) => setBankName(e.target.value)}
+                      placeholder="e.g. State Bank of India"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Bank Branch Address <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="text"
+                      value={bankBranch}
+                      onChange={(e) => setBankBranch(e.target.value)}
+                      placeholder="e.g. Bhopal Main Branch"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase font-mono">Account Number <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="text"
+                      value={bankAccountNo}
+                      onChange={(e) => setBankAccountNo(e.target.value)}
+                      placeholder="912010045678912"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono font-bold"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase font-mono">IFSC Code <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="text"
+                      value={bankIfsc}
+                      onChange={(e) => setBankIfsc(e.target.value.toUpperCase())}
+                      placeholder="SBIN0000324"
+                      maxLength={11}
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono font-bold uppercase"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Existing Loans / Outstanding Liabilities Details</label>
+                  <input
+                    type="text"
+                    value={existingLoans}
+                    onChange={(e) => setExistingLoans(e.target.value)}
+                    placeholder="e.g. Unsecured Business Loan ₹5,00,000 from Axis Bank (Outstanding ₹2.1L), or None"
+                    className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                  />
+                </div>
+              </div>
+
+              {/* Sub-Section 4: Guarantor Registry */}
+              <div className="space-y-4 pt-4 border-t border-slate-100">
+                <h4 className="text-[11px] font-mono font-bold text-indigo-600 uppercase tracking-wider flex items-center gap-1">
+                  🛡️ 4. Sovereign Guarantor Registry (Third-Party Security)
+                </h4>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Guarantor Name <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="text"
+                      value={guarantorName}
+                      onChange={(e) => setGuarantorName(e.target.value)}
+                      placeholder="e.g. Suresh Sharma"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Guarantor Personal Net Worth (INR) <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="number"
+                      value={guarantorNetWorth}
+                      onChange={(e) => setGuarantorNetWorth(Number(e.target.value))}
+                      placeholder="e.g. 5000000"
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-medium"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Guarantor PAN Card <span className="text-indigo-600 font-bold">*</span></label>
+                    <input
+                      type="text"
+                      value={guarantorPan}
+                      onChange={(e) => setGuarantorPan(e.target.value.toUpperCase())}
+                      placeholder="ABCDE9876G"
+                      maxLength={10}
+                      className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-indigo-500 font-mono font-bold uppercase"
+                    />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          )}
+
+          {/* STEP 3: PROJECT OPERATIONS */}
+          {currentStep === 3 && (
+            <div className="space-y-6 animate-fadeIn">
+              <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                    <Wrench className="w-4 h-4 text-indigo-600" />
+                    Project Site & Resource Requirements
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Outline the tangible physical infrastructure, utility dependencies, and labour constraints.</p>
+                </div>
+                <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono font-bold uppercase">Step 3 of 6</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Project Site Location Address</label>
+                  <input
+                    type="text"
+                    value={projectLocation}
+                    onChange={(e) => setProjectLocation(e.target.value)}
+                    placeholder="e.g. Govindpura Industrial Block B"
+                    className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none font-medium"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Land Holding Status</label>
+                  <select
+                    value={landOwnedRented}
+                    onChange={(e) => setLandOwnedRented(e.target.value)}
+                    className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none"
+                  >
+                    <option value="Owned">Owned (Ancestral/Purchased)</option>
+                    <option value="Rented">Leased / Rented Commercial Space</option>
+                    <option value="Government Allocated">Government Industrial Area Allotment</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Building / Physical Infrastructure</label>
+                  <select
+                    value={buildingType}
+                    onChange={(e) => setBuildingType(e.target.value)}
+                    className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none"
+                  >
+                    <option value="Shed/Factory Area">Industrial Shed / Factory Workspace</option>
+                    <option value="Commercial Shop">Retail / Commercial Shopfront</option>
+                    <option value="Corporate Office">Corporate Office Suite</option>
+                    <option value="Open Land">Open Land (Agriculture/Pasture)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-mono font-bold text-slate-500 uppercase flex items-center justify-between">
+                    <span>Machinery & Major Equipment List</span>
+                    <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 font-mono text-[9px] uppercase font-bold px-1 py-0.2 rounded scale-95 ml-1">User Input</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={machineryDetails}
+                    onChange={(e) => setMachineryDetails(e.target.value)}
+                    placeholder="e.g. 50-cow automatic milking equipment, pasteurization machine, cold storage chilling plant."
+                    className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none font-medium leading-relaxed"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-mono font-bold text-slate-500 uppercase flex items-center justify-between">
+                    <span>Raw Materials & Primary Supplies</span>
+                    <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 font-mono text-[9px] uppercase font-bold px-1 py-0.2 rounded scale-95 ml-1">User Input</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={rawMaterialsDetails}
+                    onChange={(e) => setRawMaterialsDetails(e.target.value)}
+                    placeholder="e.g. High yield feed concentrates, vaccine packages, bulk transport canisters."
+                    className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none font-medium leading-relaxed"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Production Capacity (Monthly)</label>
+                  <input
+                    type="text"
+                    value={productionCapacity}
+                    onChange={(e) => setProductionCapacity(e.target.value)}
+                    placeholder="e.g. 30,000 Litres milk"
+                    className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none font-medium"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-mono font-bold text-slate-500 uppercase flex items-center justify-between">
+                    <span>Employees Count</span>
+                    <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 font-mono text-[9px] uppercase font-bold px-1 py-0.2 rounded scale-95 ml-1">User Input</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEmployeesCount(Math.max(1, employeesCount - 1))}
+                      className="bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 p-2 rounded-lg font-bold w-9 h-9 flex items-center justify-center cursor-pointer"
+                    >
+                      -
+                    </button>
+                    <span className="text-xs font-mono font-bold w-10 text-center">{employeesCount}</span>
+                    <button
+                      type="button"
+                      onClick={() => setEmployeesCount(employeesCount + 1)}
+                      className="bg-white hover:bg-slate-100 border border-slate-200 text-slate-600 p-2 rounded-lg font-bold w-9 h-9 flex items-center justify-center cursor-pointer"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Power / Utility Needs</label>
+                  <select
+                    value={electricityNeeds}
+                    onChange={(e) => setElectricityNeeds(e.target.value)}
+                    className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none"
+                  >
+                    <option value="Single-Phase (Domestic)">Single-Phase Domestic Connection</option>
+                    <option value="3-Phase Power (15 HP)">3-Phase Commercial Power (15 HP)</option>
+                    <option value="3-Phase Power (30 HP)">3-Phase Industrial Power (30 HP+)</option>
+                    <option value="Solar Powered Offgrid">Off-Grid Solar Hybrid Power</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Commissioning Timeline</label>
+                  <select
+                    value={`${timelineMonths} Months`}
+                    onChange={(e) => setTimelineMonths(Number(e.target.value.replace(/[^0-9]/g, "")))}
+                    className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none"
+                  >
+                    <option value="3 Months">Rapid Setup (3 Months)</option>
+                    <option value="6 Months">Standard Rollout (6 Months)</option>
+                    <option value="12 Months">Comprehensive Capital Phase (12 Months)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: FINANCIAL STRUCTURE & LIVE CALCULATOR */}
+          {currentStep === 4 && (() => {
+            const details = calculateLoanDetails();
+            return (
+              <div className="space-y-6 animate-fadeIn">
+                <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                      <Calculator className="w-4 h-4 text-indigo-600" />
+                      Financial Cost Parameters & Repayment Core
+                    </h3>
+                    <p className="text-[11px] text-slate-400">Specify venture outlay and debt requirements to see immediate bank metrics.</p>
+                  </div>
+                  <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono font-bold uppercase">Step 4 of 6</span>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                  
+                  {/* Left Controls */}
+                  <div className="lg:col-span-7 space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-mono font-bold text-slate-500 uppercase flex items-center justify-between">
+                          <span>Total Project Cost (Outlay)</span>
+                          <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 font-mono text-[9px] uppercase font-bold px-1 py-0.2 rounded scale-95 ml-1">User Input</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={budgetAmount}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setBudgetAmount(val);
+                            // Recalculate balanced debt/equity as standard 70/30 guideline
+                            const recalculatedOwn = Math.round(val * 0.3);
+                            setOwnInvestment(recalculatedOwn);
+                            setLoanRequirement(val - recalculatedOwn);
+                          }}
+                          className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none font-bold"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-mono font-bold text-slate-500 uppercase flex items-center justify-between">
+                          <span>Own Investment (Promoter Equity)</span>
+                          <span className="bg-amber-100 border border-amber-300 text-amber-800 font-bold px-1.5 py-0.2 rounded text-[9px] uppercase">Estimated</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={ownInvestment}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setOwnInvestment(val);
+                            if (val <= budgetAmount) {
+                              setLoanRequirement(budgetAmount - val);
+                            }
+                          }}
+                          className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-amber-200 border-2 focus:outline-none font-semibold text-slate-700"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-mono font-bold text-slate-500 uppercase flex items-center justify-between">
+                          <span>Required Bank Loan (Debt)</span>
+                          <span className="bg-amber-100 border border-amber-300 text-amber-800 font-bold px-1.5 py-0.2 rounded text-[9px] uppercase">Estimated</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={loanRequirement}
+                          onChange={(e) => {
+                            const val = Number(e.target.value);
+                            setLoanRequirement(val);
+                            if (val <= budgetAmount) {
+                              setOwnInvestment(budgetAmount - val);
+                            }
+                          }}
+                          className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-amber-200 border-2 focus:outline-none font-semibold text-slate-700"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-mono font-bold text-slate-500 uppercase flex items-center justify-between">
+                          <span>Working Capital Margin</span>
+                          <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 font-mono text-[9px] uppercase font-bold px-1 py-0.2 rounded scale-95 ml-1">User Input</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={workingCapital}
+                          onChange={(e) => setWorkingCapital(Number(e.target.value))}
+                          className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none font-medium"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-mono font-bold text-slate-500 uppercase flex items-center justify-between">
+                          <span>Est. Monthly Expenses</span>
+                          <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 font-mono text-[9px] uppercase font-bold px-1 py-0.2 rounded scale-95 ml-1">User Input</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={monthlyExpenses}
+                          onChange={(e) => setMonthlyExpenses(Number(e.target.value))}
+                          className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none font-medium"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-mono font-bold text-slate-500 uppercase flex items-center justify-between">
+                          <span>Projected Annual Revenue</span>
+                          <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 font-mono text-[9px] uppercase font-bold px-1 py-0.2 rounded scale-95 ml-1">User Input</span>
+                        </label>
+                        <input
+                          type="number"
+                          value={projectedAnnualRevenue}
+                          onChange={(e) => setProjectedAnnualRevenue(Number(e.target.value))}
+                          className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none font-bold"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Loan Amortization Rate (% p.a.)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={loanInterestRate}
+                          onChange={(e) => setLoanInterestRate(Number(e.target.value))}
+                          className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none font-mono"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[11px] font-mono font-bold text-slate-500 uppercase">Loan Amortization Tenure</label>
+                        <select
+                          value={`${loanTenureYears} Years`}
+                          onChange={(e) => setLoanTenureYears(Number(e.target.value.replace(/[^0-9]/g, "")))}
+                          className="bg-white text-xs text-slate-800 p-2.5 rounded-xl border border-slate-200 focus:outline-none"
+                        >
+                          <option value="3 Years">3 Years Amortization</option>
+                          <option value="5 Years">5 Years Amortization</option>
+                          <option value="7 Years">7 Years Amortization (Agri Standard)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Realtime Gauge Card */}
+                  <div className="lg:col-span-5 bg-gradient-to-br from-indigo-950 to-slate-900 text-white rounded-2xl p-5 border border-indigo-500/20 space-y-4">
+                    <h4 className="text-[11px] font-mono font-bold text-indigo-300 uppercase tracking-widest flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      Live Bank Underwriting Cockpit
+                    </h4>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                        <span className="text-[9px] font-mono text-slate-400 uppercase">Monthly EMI (P+I)</span>
+                        <div className="text-sm font-bold text-indigo-200 mt-1 flex items-center gap-1">
+                          <Coins className="w-4 h-4 text-emerald-400" />
+                          ₹{details.monthlyEmi.toLocaleString()}
+                        </div>
+                      </div>
+
+                      <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                        <span className="text-[9px] font-mono text-slate-400 uppercase">Debt-Service Ratio (DSCR)</span>
+                        <div className="text-sm font-bold text-emerald-400 mt-1 flex items-center gap-1.5">
+                          <TrendingUp className="w-4 h-4 text-emerald-400" />
+                          <span className="bg-emerald-50 border-emerald-200 border text-emerald-700 font-bold px-1.5 py-0.2 rounded text-[10px]">{details.dscr}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-3.5 space-y-2">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">Promoter Equity Contribution:</span>
+                        <span className="font-bold font-mono text-amber-200">{Math.round((ownInvestment / budgetAmount) * 100)}%</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">Financed Bank Debt:</span>
+                        <span className="font-bold font-mono text-indigo-300">{Math.round((loanRequirement / budgetAmount) * 100)}%</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">Total Outlay Cost:</span>
+                        <span className="font-bold font-mono">₹{budgetAmount.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between text-xs border-t border-white/10 pt-2 text-slate-400">
+                        <span>Cumulative Interest Payable:</span>
+                        <span className="font-mono text-amber-300 font-bold">₹{details.totalInterest.toLocaleString()}</span>
+                      </div>
+                    </div>
+
+                    {/* Quick Repayment Schedule Table */}
+                    <div className="space-y-1.5">
+                      <span className="text-[9px] font-mono text-indigo-300 uppercase tracking-wider block">First Year Projected Schedule</span>
+                      <div className="bg-black/20 rounded-xl border border-white/5 p-2 font-mono text-[10px] text-slate-400 overflow-x-auto">
+                        <table className="w-full text-left">
+                          <thead>
+                            <tr className="border-b border-white/10 pb-1">
+                              <th className="pb-1 text-slate-300">Quarter</th>
+                              <th className="pb-1 text-slate-300">Principal Paid</th>
+                              <th className="pb-1 text-slate-300">Interest Paid</th>
+                              <th className="pb-1 text-slate-300">Balance Debt</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {[1, 2, 3, 4].map((q) => {
+                              const quarterlyEmi = details.monthlyEmi * 3;
+                              const calculatedInterest = Math.round((loanRequirement * (loanInterestRate / 100) / 4) * (1 - (q - 1) * 0.1));
+                              const calculatedPrincipal = Math.max(0, quarterlyEmi - calculatedInterest);
+                              const remDebt = Math.max(0, loanRequirement - (calculatedPrincipal * q));
+                              return (
+                                <tr key={q} className="hover:bg-white/5">
+                                  <td className="py-1">Q{q}</td>
+                                  <td className="py-1 text-emerald-400">₹{calculatedPrincipal.toLocaleString()}</td>
+                                  <td className="py-1 text-amber-400">₹{calculatedInterest.toLocaleString()}</td>
+                                  <td className="py-1">₹{remDebt.toLocaleString()}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* STEP 5: GOVERNMENT SCHEME MATCHING & CHECKLISTS */}
+          {currentStep === 5 && (
+            <div className="space-y-6 animate-fadeIn">
+              <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                    <Landmark className="w-4 h-4 text-indigo-600" />
+                    Government Scheme Recommendation & KYC Checklist
+                  </h3>
+                  <p className="text-[11px] text-slate-400">Our engine automatically matches project profiles against central and state-specific credit schemes.</p>
+                </div>
+                <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono font-bold uppercase">Step 5 of 6</span>
+              </div>
+
+              {/* Matched Schemes Panel */}
+              <div className="space-y-3">
+                <span className="text-[10px] font-mono font-bold text-indigo-600 uppercase tracking-widest block">
+                  🛡️ Dynamically Matched Sovereign Schemes
+                </span>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {matchGovernmentSchemes().map((sc, idx) => (
+                    <div key={idx} className="bg-amber-50/40 border border-amber-200 rounded-2xl p-4 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="bg-amber-100 border border-amber-300 text-amber-800 text-[9px] uppercase font-bold px-2 py-0.5 rounded-full">
+                          {sc.type}
+                        </span>
+                        <span className="text-[10px] text-emerald-700 font-mono font-bold">● Active Match</span>
+                      </div>
+                      <h4 className="font-display font-bold text-xs text-slate-800">{sc.name}</h4>
+                      <p className="text-[11px] text-slate-600 leading-normal font-medium">{sc.eligibility}</p>
+                      <p className="text-[10px] text-indigo-700 bg-indigo-50 p-2 rounded-lg border border-indigo-100/50">
+                        <strong className="font-bold">Benefits:</strong> {sc.benefits}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Missing Documents Checklists */}
+              <div className="space-y-3 pt-4 border-t border-slate-100">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest">
+                    📁 Applicant Dossier & KYC Checklist (Interactive)
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">Verify documents to ensure bank acceptance score.</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {[
+                    "PAN Card of Applicant",
+                    "Aadhaar Card of Applicant",
+                    "Passport Size Photo",
+                    "MSME Udyam Registration Certificate",
+                    "GST Registration (GSTIN)",
+                    "SPCB Pollution Consent to Establish (CTE)",
+                    "Six Months Personal Bank Statement",
+                    "Certified Machinery Quotation Letter",
+                    "NOC from Local Panchayat/Municipal Corp"
+                  ].map((doc) => {
+                    const isChecked = checkedDocs.includes(doc);
+                    return (
+                      <label 
+                        key={doc} 
+                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer ${
+                          isChecked 
+                            ? "bg-emerald-50/40 border-emerald-200 text-emerald-800" 
+                            : "bg-white border-slate-100 hover:border-slate-200 text-slate-600"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            if (isChecked) {
+                              setCheckedDocs(checkedDocs.filter(d => d !== doc));
+                            } else {
+                              setCheckedDocs([...checkedDocs, doc]);
+                            }
+                          }}
+                          className="rounded text-indigo-600 focus:ring-indigo-400 w-4 h-4 cursor-pointer"
+                        />
+                        <span className="text-xs font-semibold">{doc}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                {/* Missing warning notice */}
+                {getMissingDocuments().length > 0 && (
+                  <div className="mt-4 bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-xl">
+                    <div className="flex gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-bold text-amber-800">Preliminary DPR Protocol Engaged</p>
+                        <p className="text-[11px] text-amber-700">
+                          Preliminary DPR Generated. Final Bank DPR requires missing documents: 
+                          <span className="font-semibold text-amber-900 block mt-1">
+                            {getMissingDocuments().join(", ")}
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* STEP 6: SANITY PRE-FLIGHT COCKPIT & LAUNCH */}
+          {currentStep === 6 && (() => {
+            const details = calculateLoanDetails();
+            const balanced = (ownInvestment + loanRequirement) === budgetAmount;
+            const highMargin = details.estimatedNetProfit > (projectedAnnualRevenue * 0.9);
+            const lossMaking = Number(monthlyExpenses) * 12 > projectedAnnualRevenue;
+            const highDebt = loanRequirement > (budgetAmount * 0.85);
+            const isMP = applicantState.toLowerCase().includes("madhya-pradesh") || applicantState.toLowerCase().includes("mp");
+            
+            return (
+              <div className="space-y-6 animate-fadeIn">
+                <div className="border-b border-slate-100 pb-3 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                      <Gauge className="w-4 h-4 text-indigo-600" />
+                      AI Validation & Sanity Pre-Flight Cockpit
+                    </h3>
+                    <p className="text-[11px] text-slate-400">Instant local checks verifying feasibility, accounting integrity and policy rules.</p>
+                  </div>
+                  <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono font-bold uppercase">Step 6 of 6</span>
+                </div>
+
+                <div className="space-y-4">
+                  
+                  {/* Status checklist */}
+                  {[
+                    {
+                      title: "Venture Parameters Validation",
+                      desc: `Project Name "${projectName || "My Company"}" is distinct and registered in ${applicantState}.`,
+                      passed: !!projectName.trim(),
+                      warning: "Venture Name is empty. Step 2 requires a valid name to generate official documents."
+                    },
+                    {
+                      title: "Capital Outlay Balancing Checks",
+                      desc: `Total Project Cost (₹${budgetAmount.toLocaleString()}) equals Own Contribution + Bank Loan.`,
+                      passed: balanced,
+                      warning: `Financial Imbalance: Promoter Contribution (₹${ownInvestment.toLocaleString()}) + Required Loan (₹${loanRequirement.toLocaleString()}) must sum exactly to Total Cost (₹${budgetAmount.toLocaleString()}). Adjust values in Step 4.`
+                    },
+                    {
+                      title: "Solvency & Cash Flow Viability (DSCR)",
+                      desc: `Projected cash flow yields healthy debt service coverage ratio of ${details.dscr}.`,
+                      passed: details.dscr >= 1.25,
+                      warning: details.dscr < 1.0 
+                        ? `Severe Risk (DSCR: ${details.dscr}): Operating cash flows cannot cover debt repayments. Banks will reject this application immediately. Lower your loan requirement or increase revenue.`
+                        : `Borderline Debt Service (DSCR: ${details.dscr}): DSCR is below 1.25. Standard banking protocol recommends adjusting overheads to bolster safety margins.`
+                    },
+                    {
+                      title: "Profit Margin Feasibility Standard",
+                      desc: "Estimated operating net profit margins lie within standard industry boundaries.",
+                      passed: !highMargin && !lossMaking,
+                      warning: lossMaking 
+                        ? "Negative Margins: Estimated annual operating expenses exceed annual revenue. Business is projected to run at a loss."
+                        : "Extremely High Profit Margin: Projected net profit margin is above 90%, which is statistically highly improbable. Standardize profit projections."
+                    },
+                    {
+                      title: "Promoter Equity Margin (Sovereign Mandates)",
+                      desc: "Promoter contribution is at or above minimum sovereign threshold (15%).",
+                      passed: (ownInvestment / budgetAmount) >= 0.15,
+                      warning: `Low Promoter Contribution: Own contribution represents less than 15% of the total project. Banks require a minimum 15% to 25% promoter stake.`
+                    }
+                  ].map((chk, idx) => (
+                    <div 
+                      key={idx} 
+                      className={`p-4 rounded-2xl border flex items-start gap-3 transition-all ${
+                        chk.passed 
+                          ? "bg-emerald-50/20 border-emerald-200/60" 
+                          : "bg-amber-50/50 border-amber-200"
+                      }`}
+                    >
+                      <div className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center font-bold text-xs ${
+                        chk.passed 
+                          ? "bg-emerald-100 text-emerald-700" 
+                          : "bg-amber-100 text-amber-700"
+                      }`}>
+                        {chk.passed ? "✓" : "!"}
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-800">{chk.title}</h4>
+                        <p className={`text-[11px] mt-1 ${chk.passed ? "text-slate-600" : "text-amber-800 font-semibold"}`}>
+                          {chk.passed ? chk.desc : chk.warning}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+
+                </div>
+
+                {/* Submit Launch Actions */}
+                <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row gap-3 items-center">
+                  <button
+                    type="button"
+                    onClick={() => handleGenerateReport()}
+                    disabled={isLoading}
+                    className="w-full sm:flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-700 hover:to-indigo-800 text-white font-bold py-4 px-6 rounded-2xl text-xs tracking-wide transition-all shadow-lg disabled:from-indigo-400 disabled:to-indigo-500 cursor-pointer animate-pulse-subtle"
+                  >
+                    {isLoading ? (
+                      <>
+                        <Clock className="w-4 h-4 animate-spin" />
+                        <span>Analyzing Core & Building Sovereign Report...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-amber-300" />
+                        <span>Generate Professional Project Report</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleGenerateReport(`Open an enterprise ${businessCategory || "dairy farm"}`)}
+                    disabled={isLoading}
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold py-4 px-6 rounded-2xl text-xs transition-all cursor-pointer"
+                  >
+                    🔍 Interactive Smart Search Build
+                  </button>
+                </div>
+
+              </div>
+            );
+          })()}
+
+        </div>
+
+        {/* Wizard Footer Navigation Controls */}
+        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+          <button
+            type="button"
+            disabled={currentStep === 1}
+            onClick={() => setCurrentStep(currentStep - 1)}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold transition-all disabled:opacity-40 disabled:hover:bg-white cursor-pointer"
+          >
+            <ChevronLeft className="w-4 h-4" />
+            Previous
+          </button>
+
+          <div className="text-[10px] font-mono text-slate-400 font-bold uppercase">
+            Progress Score: {Math.round((currentStep / 6) * 100)}% Complete
+          </div>
+
+          <button
+            type="button"
+            disabled={currentStep === 6}
+            onClick={() => setCurrentStep(currentStep + 1)}
+            className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all disabled:opacity-40 disabled:hover:bg-indigo-600 cursor-pointer"
+          >
+            Next
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+
       </div>
 
       {/* Report Workspace */}
@@ -985,6 +2489,7 @@ export default function BusinessStudioView({
               { id: "marketing", label: "Marketing Strategy" },
               { id: "operational", label: "Operational Plan" },
               { id: "legal", label: "Legal & Licenses" },
+              { id: "caReview", label: "🏛️ CA Audit & Compliance" },
               { id: "financial", label: "Financial Projections" },
               { id: "dpr", label: "Bank Loan DPR" },
               { id: "investment", label: "Investment & Funding" },
