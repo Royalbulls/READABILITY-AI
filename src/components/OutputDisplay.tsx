@@ -8,9 +8,19 @@ interface OutputDisplayProps {
   isLoading: boolean;
   user?: any;
   onSpeechStateChange?: (isSpeaking: boolean) => void;
+  detectedLanguage?: string;
+  devMode?: boolean;
 }
 
-export default function OutputDisplay({ text, isLoading, user, onSpeechStateChange }: OutputDisplayProps) {
+const LANG_MAP: Record<string, string> = {
+  en: "English (EN)",
+  hi: "Hindi (हिंदी)",
+  bn: "Bengali (বাংলা)",
+  ta: "Tamil (தமிழ்)",
+  te: "Telugu (తెలుగు)",
+};
+
+export default function OutputDisplay({ text, isLoading, user, onSpeechStateChange, detectedLanguage, devMode = false }: OutputDisplayProps) {
   const [copied, setCopied] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechUtterance, setSpeechUtterance] = useState<SpeechSynthesisUtterance | null>(null);
@@ -308,10 +318,12 @@ export default function OutputDisplay({ text, isLoading, user, onSpeechStateChan
             <Sparkles className="w-6 h-6 animate-spin" />
           </div>
           <h3 className="font-display font-bold text-slate-900 text-base tracking-wide uppercase">
-            DECODING JARGON
+            {devMode ? "DECODING JARGON" : "Making it simple..."}
           </h3>
           <p className="text-slate-500 text-xs mt-2 leading-relaxed font-sans">
-            Banish the noise, synthesize the facts. Mr. Kilvish is analyzing the data structures and formulating optimal readability.
+            {devMode 
+              ? "Banish the noise, synthesize the facts. Mr. Kilvish is analyzing the data structures and formulating optimal readability." 
+              : "Reading and simplifying the details to give you clear, easy-to-understand points."}
           </p>
 
           <div className="w-full bg-slate-200 h-1 rounded-full mt-6 overflow-hidden">
@@ -330,13 +342,15 @@ export default function OutputDisplay({ text, isLoading, user, onSpeechStateChan
           <Shield className="w-7 h-7" />
         </div>
         <h3 className="font-display font-bold text-slate-900 text-base">
-          Readability Output
+          {devMode ? "Readability Output" : "Your Simplified Summary"}
         </h3>
         <p className="text-slate-500 text-xs mt-2 max-w-sm leading-relaxed">
-          Provide complex legal text, academic papers, messy notes, or medical records on the left panel, then trigger simplification.
+          {devMode 
+            ? "Provide complex legal text, academic papers, messy notes, or medical records on the left panel, then trigger simplification." 
+            : "Write something or upload a file on the left, and I will explain it simply here."}
         </p>
         <div className="mt-4 px-3 py-1.5 rounded bg-slate-50 border border-slate-200 text-[10px] font-mono text-slate-600 font-semibold uppercase tracking-widest">
-          STANDBY: Awaiting Jargon Stream
+          {devMode ? "STANDBY: Awaiting Jargon Stream" : "Ready when you are!"}
         </div>
       </div>
     );
@@ -351,6 +365,12 @@ export default function OutputDisplay({ text, isLoading, user, onSpeechStateChan
           <span className="text-xs font-mono text-slate-500 uppercase tracking-wider font-semibold">
             Simplified Output
           </span>
+          {detectedLanguage && detectedLanguage !== "en" && (
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] bg-indigo-100 text-indigo-700 border border-indigo-200 font-mono font-bold flex items-center gap-1 shrink-0 animate-pulse">
+              <span className="inline-block w-1 h-1 rounded-full bg-indigo-600" />
+              Detected: {LANG_MAP[detectedLanguage] || detectedLanguage.toUpperCase()}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -468,7 +488,7 @@ export default function OutputDisplay({ text, isLoading, user, onSpeechStateChan
               title="Save to Project Portfolio"
             >
               <FolderPlus className="w-4 h-4" />
-              <span className="hidden sm:inline">Save Project</span>
+              <span className="hidden sm:inline">{devMode ? "Save Project" : "Save"}</span>
             </button>
           )}
         </div>
@@ -488,7 +508,7 @@ export default function OutputDisplay({ text, isLoading, user, onSpeechStateChan
           <Share2 className="w-3.5 h-3.5 text-slate-400" />
           Format: Markdown Source
         </span>
-        <span>Verified by Kilvish Algorithmic Engine</span>
+        <span>{devMode ? "Verified by Kilvish Algorithmic Engine" : "Always checked for clarity and simplicity"}</span>
       </div>
 
       {/* Save to Project Modal Overlay */}

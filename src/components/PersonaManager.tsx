@@ -103,10 +103,41 @@ const PERSONAS: PersonaDefinition[] = [
 interface PersonaManagerProps {
   activePersona: PersonaType;
   onPersonaChange: (persona: PersonaType) => void;
+  devMode?: boolean;
 }
 
-export default function PersonaManager({ activePersona, onPersonaChange }: PersonaManagerProps) {
+export default function PersonaManager({ activePersona, onPersonaChange, devMode = false }: PersonaManagerProps) {
   const currentPersona = PERSONAS.find(p => p.id === activePersona) || PERSONAS[0];
+
+  const getToolDisplayName = (name: string) => {
+    if (devMode) return name;
+    switch(name) {
+      case "Google Search Grounding": return "Factual Search Protection";
+      case "Dual-Section Synthesis": return "Step-by-Step Clarity Formatting";
+      case "GST & MSME Advisor": return "Business Setup & Schemes Guide";
+      case "CA Financial Assessor": return "Profit & Expenses Tracker";
+      case "Concept Visualizer": return "Real-world Analogies & Examples";
+      case "Quiz & MCQ Generator": return "Custom Quizzes & Practice Tests";
+      case "LTV/CAC Metric Optimizer": return "Marketing & Cost Analytics";
+      case "Venture Funding Matcher": return "Investment & Funding Finder";
+      default: return name;
+    }
+  };
+
+  const getToolDisplayDesc = (name: string, originalDesc: string) => {
+    if (devMode) return originalDesc;
+    switch(name) {
+      case "Google Search Grounding": return "Verifies every fact against the latest live web search.";
+      case "Dual-Section Synthesis": return "Breaks down documents into a brief overview followed by detailed points.";
+      case "GST & MSME Advisor": return "Lists government schemes and legal setups you might need.";
+      case "CA Financial Assessor": return "Helps you estimate profits, costs, and check if your plan makes money.";
+      case "Concept Visualizer": return "Explains tough topics using clear real-world examples.";
+      case "Quiz & MCQ Generator": return "Creates practice quizzes to test your understanding.";
+      case "LTV/CAC Metric Optimizer": return "Helps you understand customer acquisition costs and long-term customer value.";
+      case "Venture Funding Matcher": return "Finds the right funding stages, ticket sizes, and benchmarks.";
+      default: return originalDesc;
+    }
+  };
 
   return (
     <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5 flex flex-col gap-4">
@@ -114,11 +145,13 @@ export default function PersonaManager({ activePersona, onPersonaChange }: Perso
       <div className="flex items-center justify-between border-b border-slate-100 pb-3">
         <h3 className="font-display font-bold text-sm text-slate-800 tracking-wider uppercase flex items-center gap-2">
           <Sliders className="w-4 h-4 text-slate-900" />
-          Intelligence Persona OS
+          {devMode ? "Intelligence Persona OS" : "Choose Your Helper"}
         </h3>
-        <span className="text-[9px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
-          SWAPPABLE SYSTEM PROMPT
-        </span>
+        {devMode && (
+          <span className="text-[9px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded border border-slate-200">
+            SWAPPABLE SYSTEM PROMPT
+          </span>
+        )}
       </div>
 
       {/* Selectors Grid */}
@@ -162,7 +195,7 @@ export default function PersonaManager({ activePersona, onPersonaChange }: Perso
         <div className="flex items-start justify-between">
           <div>
             <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest">
-              Active Role & Catchphrase
+              {devMode ? "Active Role & Catchphrase" : "Your Helper's Personality"}
             </div>
             <div className="text-xs font-bold text-slate-800 mt-0.5">
               {currentPersona.title} &bull; <span className="italic text-indigo-600">&quot;{currentPersona.catchphrase}&quot;</span>
@@ -174,7 +207,7 @@ export default function PersonaManager({ activePersona, onPersonaChange }: Perso
         <div>
           <div className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
             <Terminal className="w-3.5 h-3.5" />
-            Active Workspace Tools (No-Mock)
+            {devMode ? "Active Workspace Tools (No-Mock)" : "How This Helper Guides You"}
           </div>
           <div className="flex flex-col gap-1.5">
             {currentPersona.tools.map((t, idx) => (
@@ -183,11 +216,11 @@ export default function PersonaManager({ activePersona, onPersonaChange }: Perso
                   <Check className="w-3 h-3" />
                 </div>
                 <div>
-                  <div className="font-semibold text-slate-800 leading-none">{t.name}</div>
-                  <div className="text-[10px] text-slate-500 mt-1 leading-snug">{t.description}</div>
+                  <div className="font-semibold text-slate-800 leading-none">{getToolDisplayName(t.name)}</div>
+                  <div className="text-[10px] text-slate-500 mt-1 leading-snug">{getToolDisplayDesc(t.name, t.description)}</div>
                 </div>
                 <span className="ml-auto text-[9px] font-mono font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 uppercase">
-                  {t.status}
+                  {devMode ? t.status : "Active"}
                 </span>
               </div>
             ))}

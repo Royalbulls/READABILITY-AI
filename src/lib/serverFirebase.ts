@@ -1716,7 +1716,7 @@ export async function processPayUSubscriptionSuccess(txnid: string, payload: any
       totalAmount: Number(txData.amount),
       status: "paid",
       billingName: payload.firstname || user.displayName || "Readability Scholar",
-      billingEmail: payload.email || user.email || "scholar@readability.ai",
+      billingEmail: payload.email || user.email || "scholar@readability.rbaadvisor.com",
       billingPhone: payload.phone || "9999999999",
       timestamp: now
     };
@@ -1807,7 +1807,7 @@ export async function processPayUSubscriptionSuccess(txnid: string, payload: any
         totalAmount: Number(txData.amount),
         status: "paid",
         billingName: payload.firstname || user.displayName || "Readability Scholar",
-        billingEmail: payload.email || user.email || "scholar@readability.ai",
+        billingEmail: payload.email || user.email || "scholar@readability.rbaadvisor.com",
         billingPhone: payload.phone || "9999999999",
         timestamp: now
       };

@@ -1189,7 +1189,7 @@ export function EnterpriseSettingsView({ user, userProfile }: CreatorOSAddonsPro
                 </thead>
                 <tbody className="divide-y divide-slate-900 text-[11px] text-slate-300">
                   <tr>
-                    <td className="py-2.5 font-bold text-white">jane_doe@readability.cloud</td>
+                    <td className="py-2.5 font-bold text-white">jane_doe@readability.rbaadvisor.com</td>
                     <td className="py-2.5 text-indigo-400">Owner / Director</td>
                     <td className="py-2.5 text-right text-emerald-400 font-bold">Owner</td>
                   </tr>

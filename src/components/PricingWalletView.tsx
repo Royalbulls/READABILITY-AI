@@ -226,7 +226,7 @@ export default function PricingWalletView({ user, userProfile, onRefreshProfile 
           amount: String(amount),
           productinfo: `${planName} Subscription - Readability AI`,
           firstname: userProfile?.displayName || "Readability Scholar",
-          email: userProfile?.email || "scholar@readability.ai",
+          email: userProfile?.email || "scholar@readability.rbaadvisor.com",
           phone: "9999999999",
           mode: "CC"
         })

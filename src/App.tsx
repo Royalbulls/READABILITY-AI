@@ -56,7 +56,7 @@ export default function App() {
   // Authentication states
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [activeView, setActiveView] = useState<"workspace" | "pricing" | "growth" | "admin" | "business" | "academy" | "search" | "projects">("workspace");
+  const [activeView, setActiveView] = useState<"workspace" | "pricing" | "growth" | "admin" | "business" | "academy" | "search" | "projects" | "create_earn">("workspace");
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [complianceTab, setComplianceTab] = useState<"privacy" | "terms" | "refund" | "contact" | "about" | null>(null);
 
@@ -79,7 +79,9 @@ export default function App() {
   const [imageMimeType, setImageMimeType] = useState<string | null>(null);
   
   // App system states
+  const [devMode, setDevMode] = useState(false);
   const [output, setOutput] = useState("");
+  const [detectedLanguage, setDetectedLanguage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [kilvishStatus, setKilvishStatus] = useState<"idle" | "loading" | "speaking">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -469,6 +471,7 @@ export default function App() {
     setKilvishStatus("loading");
     setError(null);
     setOutput("");
+    setDetectedLanguage("");
 
     try {
       const payload: any = {
@@ -519,6 +522,7 @@ export default function App() {
       }
 
       setOutput(data.result);
+      setDetectedLanguage(data.detectedLanguage || "en");
       setKilvishStatus("idle");
 
       // Save to logs
@@ -595,6 +599,8 @@ export default function App() {
         activeView={activeView}
         setActiveView={setActiveView}
         userProfile={userProfile}
+        devMode={devMode}
+        setDevMode={setDevMode}
       />
 
       {/* Main Content Pane */}
@@ -604,21 +610,28 @@ export default function App() {
           {/* 5-Step Connected Pipeline Tracker */}
           <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto max-w-full">
             {[
-              { step: 1, label: "Learn", desc: "AI Academy", view: "academy", tab: "dashboard", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
-              { step: 2, label: "Build", desc: "Business Studio", view: "business", tab: "dashboard", color: "text-violet-400 bg-violet-500/10 border-violet-500/20" },
-              { step: 3, label: "Launch", desc: "Launch Product", view: "growth", tab: "launch", color: "text-sky-400 bg-sky-500/10 border-sky-500/20" },
-              { step: 4, label: "Earn", desc: "Marketplace", view: "growth", tab: "marketplace", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
-              { step: 5, label: "Scale", desc: "Analytics & CRM", view: "growth", tab: "analytics", color: "text-pink-400 bg-pink-500/10 border-pink-500/20" },
+              { step: 1, label: "Learn", desc: "Learn Anything", view: "academy", tab: "dashboard", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
+              { step: 2, label: "Build", desc: "Business Planner", view: "business", tab: "dashboard", color: "text-violet-400 bg-violet-500/10 border-violet-500/20" },
+              { step: 3, label: "Launch", desc: "Grow My Business", view: "growth", tab: "launch", color: "text-sky-400 bg-sky-500/10 border-sky-500/20" },
+              { step: 4, label: "Earn", desc: "Create & Earn", view: "create_earn", tab: "creator", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
+              { step: 5, label: "Scale", desc: "Our Clients & Grow", view: "growth", tab: "crm", color: "text-pink-400 bg-pink-500/10 border-pink-500/20" },
             ].map((s) => {
               // Determine active status
-              const isActive = activeView === s.view && (s.view !== "growth" || growthHubInitialTab === s.tab);
+              const isActive = (s.view === "create_earn" && activeView === "create_earn") ||
+                (s.view === "growth" && s.tab === "creator" && activeView === "create_earn") ||
+                (s.view === "growth" && s.tab !== "creator" && activeView === "growth" && growthHubInitialTab === s.tab) ||
+                (s.view !== "growth" && s.view !== "create_earn" && activeView === s.view);
               return (
                 <button
                   key={s.step}
                   onClick={() => {
-                    setActiveView(s.view as any);
-                    if (s.view === "growth") {
-                      setGrowthHubInitialTab(s.tab as any);
+                    if (s.view === "create_earn") {
+                      setActiveView("create_earn");
+                    } else {
+                      setActiveView(s.view as any);
+                      if (s.view === "growth") {
+                        setGrowthHubInitialTab(s.tab as any);
+                      }
                     }
                   }}
                   className={`px-3 py-1.5 rounded-xl border transition-all duration-200 cursor-pointer flex items-center gap-2 text-left shrink-0 ${
@@ -647,12 +660,13 @@ export default function App() {
             userProfile={userProfile}
             onRefreshProfile={() => fetchUserProfile(user)}
           />
-        ) : activeView === "growth" && user ? (
+        ) : (activeView === "growth" || activeView === "create_earn") && user ? (
           <GrowthHubView 
             user={user}
             userProfile={userProfile}
             onRefreshProfile={() => fetchUserProfile(user)}
-            initialTab={growthHubInitialTab}
+            initialTab={activeView === "create_earn" ? "creator" : growthHubInitialTab}
+            devMode={devMode}
           />
         ) : activeView === "business" && user ? (
           <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col items-center">
@@ -707,22 +721,22 @@ export default function App() {
           <MrKilvishAvatar status={kilvishStatus} />
 
           {/* Persona Manager */}
-          <PersonaManager activePersona={activePersona} onPersonaChange={setActivePersona} />
+          <PersonaManager activePersona={activePersona} onPersonaChange={setActivePersona} devMode={devMode} />
 
           {/* Core Input Panel */}
           <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5 flex flex-col gap-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h2 className="font-display font-bold text-sm text-slate-800 tracking-wider uppercase flex items-center gap-2">
                 <span className="w-1.5 h-3 bg-slate-900 rounded-full" />
-                Workspace Input
+                {devMode ? "Workspace Input" : "Your Input"}
               </h2>
               <button
                 type="button"
                 onClick={handleWipeForm}
-                className="text-[11px] font-mono font-semibold text-slate-500 hover:text-rose-600 transition-all duration-300 flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 rounded border border-slate-200"
+                className="text-[11px] font-mono font-semibold text-slate-500 hover:text-rose-600 transition-all duration-300 flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 rounded border border-slate-200 cursor-pointer"
               >
                 <Eraser className="w-3.5 h-3.5" />
-                Clear Workspace
+                {devMode ? "Clear Workspace" : "Start Fresh"}
               </button>
             </div>
 
@@ -731,7 +745,7 @@ export default function App() {
               <div className="flex items-start gap-2.5 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <div className="leading-relaxed">
-                  <span className="font-semibold font-mono">WORKSPACE ERROR:</span> {error}
+                  <span className="font-semibold font-mono">{devMode ? "WORKSPACE ERROR:" : "ERROR:"}</span> {error}
                 </div>
               </div>
             )}
@@ -751,7 +765,7 @@ export default function App() {
                 }`}
               >
                 <FileText className="w-4.5 h-4.5" />
-                Simplify Document
+                {devMode ? "Simplify Document" : "Explain Document"}
               </button>
               <button
                 type="button"
@@ -766,7 +780,7 @@ export default function App() {
                 }`}
               >
                 <Infinity className="w-4.5 h-4.5" />
-                Infinity Search
+                {devMode ? "Infinity Search" : "Search & Learn"}
               </button>
             </div>
 
@@ -934,12 +948,12 @@ export default function App() {
                 {isLoading ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>SYNTHESIZING...</span>
+                    <span>{devMode ? "SYNTHESIZING..." : "Working..."}</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    <span>{inputTab === "search" ? "Search & Explain" : "Banish Jargon"}</span>
+                    <span>{inputTab === "search" ? (devMode ? "Search & Explain" : "Search & Learn") : (devMode ? "Banish Jargon" : "Explain")}</span>
                     <ArrowRight className="w-4 h-4 text-white" />
                   </>
                 )}
@@ -965,6 +979,8 @@ export default function App() {
               text={output} 
               isLoading={isLoading} 
               user={user}
+              detectedLanguage={detectedLanguage}
+              devMode={devMode}
               onSpeechStateChange={(isSpeaking) => {
                 setKilvishStatus(isSpeaking ? "speaking" : "idle");
               }}

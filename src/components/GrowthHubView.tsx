@@ -69,9 +69,10 @@ interface GrowthHubViewProps {
   onRefreshProfile: () => void;
   initialTab?: "dashboard" | "profile" | "creator" | "marketplace" | "launch" | "earnings" | "referrals" | "admin" |
     "business-studio" | "academy-integration" | "marketing-studio" | "crm" | "automation" | "analytics" | "enterprise-settings";
+  devMode?: boolean;
 }
 
-export default function GrowthHubView({ user, userProfile, onRefreshProfile, initialTab }: GrowthHubViewProps) {
+export default function GrowthHubView({ user, userProfile, onRefreshProfile, initialTab, devMode = false }: GrowthHubViewProps) {
   // Navigation tabs in Creator Hub
   const [activeTab, setActiveTab] = useState<
     "dashboard" | "profile" | "creator" | "marketplace" | "launch" | "earnings" | "referrals" | "admin" |
@@ -99,12 +100,12 @@ export default function GrowthHubView({ user, userProfile, onRefreshProfile, ini
   const [skills, setSkills] = useState(userProfile?.creatorProfile?.skills?.join(", ") || "AI, Research, Medicine, Law");
   const [category, setCategory] = useState(userProfile?.creatorProfile?.category || "Education");
   const [location, setLocation] = useState(userProfile?.creatorProfile?.location || "Global");
-  const [website, setWebsite] = useState(userProfile?.creatorProfile?.website || "https://readability.cloud");
+  const [website, setWebsite] = useState(userProfile?.creatorProfile?.website || "https://readability.rbaadvisor.com");
   const [twitter, setTwitter] = useState(userProfile?.creatorProfile?.socialLinks?.twitter || "");
   const [linkedin, setLinkedin] = useState(userProfile?.creatorProfile?.socialLinks?.linkedin || "");
   const [brandLogo, setBrandLogo] = useState(userProfile?.creatorProfile?.brandLogo || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=80&auto=format&fit=crop&q=80");
   const [brandName, setBrandName] = useState(userProfile?.creatorProfile?.brandName || "Readability Labs");
-  const [portfolio, setPortfolio] = useState(userProfile?.creatorProfile?.portfolio || "https://portfolio.readability.cloud");
+  const [portfolio, setPortfolio] = useState(userProfile?.creatorProfile?.portfolio || "https://portfolio.readability.rbaadvisor.com");
   const [email, setEmail] = useState(userProfile?.creatorProfile?.email || userProfile?.email || "");
   const [phone, setPhone] = useState(userProfile?.creatorProfile?.phone || "+1 (555) 019-2834");
   const [languages, setLanguages] = useState(userProfile?.creatorProfile?.languages || "English, Hindi, Spanish");
@@ -156,6 +157,72 @@ export default function GrowthHubView({ user, userProfile, onRefreshProfile, ini
     fetchProducts();
     if (userProfile?.role === "admin") {
       fetchAdminUsers();
+    }
+  }, [userProfile]);
+
+  // Sync local states with userProfile when it loads or gets updated (e.g. after save)
+  useEffect(() => {
+    if (userProfile) {
+      if (userProfile.creatorProfile?.photo) {
+        setProfilePhoto(userProfile.creatorProfile.photo);
+      }
+      if (userProfile.creatorProfile?.coverBanner) {
+        setCoverBanner(userProfile.creatorProfile.coverBanner);
+      }
+      setDisplayName(userProfile.creatorProfile?.displayName || userProfile.displayName || "");
+      setUsername(userProfile.creatorProfile?.username || userProfile.email?.split("@")[0] || "");
+      if (userProfile.creatorProfile?.bio) {
+        setBio(userProfile.creatorProfile.bio);
+      }
+      if (userProfile.creatorProfile?.skills) {
+        setSkills(userProfile.creatorProfile.skills.join(", "));
+      }
+      if (userProfile.creatorProfile?.category) {
+        setCategory(userProfile.creatorProfile.category);
+      }
+      if (userProfile.creatorProfile?.location) {
+        setLocation(userProfile.creatorProfile.location);
+      }
+      if (userProfile.creatorProfile?.website) {
+        setWebsite(userProfile.creatorProfile.website);
+      }
+      if (userProfile.creatorProfile?.socialLinks?.twitter) {
+        setTwitter(userProfile.creatorProfile.socialLinks.twitter);
+      }
+      if (userProfile.creatorProfile?.socialLinks?.linkedin) {
+        setLinkedin(userProfile.creatorProfile.socialLinks.linkedin);
+      }
+      if (userProfile.creatorProfile?.brandLogo) {
+        setBrandLogo(userProfile.creatorProfile.brandLogo);
+      }
+      if (userProfile.creatorProfile?.brandName) {
+        setBrandName(userProfile.creatorProfile.brandName);
+      }
+      if (userProfile.creatorProfile?.portfolio) {
+        setPortfolio(userProfile.creatorProfile.portfolio);
+      }
+      setEmail(userProfile.creatorProfile?.email || userProfile.email || "");
+      if (userProfile.creatorProfile?.phone) {
+        setPhone(userProfile.creatorProfile.phone);
+      }
+      if (userProfile.creatorProfile?.languages) {
+        setLanguages(userProfile.creatorProfile.languages);
+      }
+      if (userProfile.creatorProfile?.socialLinks?.youtube) {
+        setYoutube(userProfile.creatorProfile.socialLinks.youtube);
+      }
+      if (userProfile.creatorProfile?.socialLinks?.instagram) {
+        setInstagram(userProfile.creatorProfile.socialLinks.instagram);
+      }
+      if (userProfile.creatorProfile?.socialLinks?.facebook) {
+        setFacebook(userProfile.creatorProfile.socialLinks.facebook);
+      }
+      if (userProfile.creatorProfile?.socialLinks?.github) {
+        setGithub(userProfile.creatorProfile.socialLinks.github);
+      }
+      if (userProfile.creatorProfile?.personalDomain) {
+        setPersonalDomain(userProfile.creatorProfile.personalDomain);
+      }
     }
   }, [userProfile]);
 
@@ -707,13 +774,13 @@ export default function GrowthHubView({ user, userProfile, onRefreshProfile, ini
           {/* Section 1: Core Workspace */}
           <div className="space-y-1">
             <div className="px-3 py-1 text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest border-b border-slate-900 mb-2">
-              Workspace Core
+              {devMode ? "Workspace Core" : "Your Work"}
             </div>
             {[
-              { id: "dashboard", label: "Creator Dashboard", icon: TrendingUp },
-              { id: "profile", label: "Creator Profile", icon: User },
-              { id: "creator", label: "AI Content Creator", icon: Sparkles },
-              { id: "marketplace", label: "Marketplace Catalog", icon: Compass }
+              { id: "dashboard", label: devMode ? "Creator Dashboard" : "Dashboard", icon: TrendingUp },
+              { id: "profile", label: devMode ? "Creator Profile" : "My Profile", icon: User },
+              { id: "creator", label: devMode ? "AI Content Creator" : "Create & Earn", icon: Sparkles },
+              { id: "marketplace", label: devMode ? "Marketplace Catalog" : "Marketplace", icon: Compass }
             ].map(tab => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -744,12 +811,12 @@ export default function GrowthHubView({ user, userProfile, onRefreshProfile, ini
           {/* Section 2: Financials & Growth */}
           <div className="space-y-1">
             <div className="px-3 py-1 text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest border-b border-slate-900 mb-2">
-              Financials & Growth
+              {devMode ? "Financials & Growth" : "Money & Scale"}
             </div>
             {[
-              { id: "launch", label: "Launch & Promos", icon: Award },
-              { id: "earnings", label: "Earnings & Wallet", icon: DollarSign },
-              { id: "referrals", label: "Referral Program", icon: Share2 }
+              { id: "launch", label: devMode ? "Launch & Promos" : "Promote", icon: Award },
+              { id: "earnings", label: devMode ? "Earnings & Wallet" : "Earnings", icon: DollarSign },
+              { id: "referrals", label: devMode ? "Referral Program" : "Referrals", icon: Share2 }
             ].map(tab => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -780,15 +847,15 @@ export default function GrowthHubView({ user, userProfile, onRefreshProfile, ini
           {/* Section 3: AI Enterprise Systems */}
           <div className="space-y-1">
             <div className="px-3 py-1 text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest border-b border-slate-900 mb-2">
-              AI Enterprise Systems
+              {devMode ? "AI Enterprise Systems" : "Advanced Tools"}
             </div>
             {[
-              { id: "business-studio", label: "AI Business Studio", icon: Building2 },
-              { id: "academy-integration", label: "AI Academy Sync", icon: BookOpen },
-              { id: "marketing-studio", label: "AI Marketing Studio", icon: Megaphone },
-              { id: "crm", label: "AI CRM Pipeline", icon: Users },
-              { id: "automation", label: "AI Automation", icon: GitBranch },
-              { id: "analytics", label: "AI BI Analytics", icon: BarChart3 }
+              { id: "business-studio", label: devMode ? "AI Business Studio" : "Business Planner", icon: Building2 },
+              { id: "academy-integration", label: devMode ? "AI Academy Sync" : "Learn", icon: BookOpen },
+              { id: "marketing-studio", label: devMode ? "AI Marketing Studio" : "Marketing Tools", icon: Megaphone },
+              { id: "crm", label: devMode ? "AI CRM Pipeline" : "Customer Relations", icon: Users },
+              { id: "automation", label: devMode ? "AI Automation" : "Automations", icon: GitBranch },
+              { id: "analytics", label: devMode ? "AI BI Analytics" : "Analytics", icon: BarChart3 }
             ].map(tab => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -819,11 +886,11 @@ export default function GrowthHubView({ user, userProfile, onRefreshProfile, ini
           {/* Section 4: Administration & Scale */}
           <div className="space-y-1">
             <div className="px-3 py-1 text-[9px] font-mono font-bold text-slate-500 uppercase tracking-widest border-b border-slate-900 mb-2">
-              Administration & Scale
+              {devMode ? "Administration & Scale" : "Management"}
             </div>
             {[
-              ...(isAdmin ? [{ id: "admin", label: "Admin Moderate", icon: Shield }] : []),
-              { id: "enterprise-settings", label: "Enterprise Settings", icon: Settings }
+              ...(isAdmin ? [{ id: "admin", label: devMode ? "Admin Moderate" : "Admin", icon: Shield }] : []),
+              { id: "enterprise-settings", label: devMode ? "Enterprise Settings" : "Settings", icon: Settings }
             ].map(tab => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -1724,11 +1791,11 @@ export default function GrowthHubView({ user, userProfile, onRefreshProfile, ini
                       <div className="min-w-0">
                         <span className="text-[9px] font-mono text-slate-500 uppercase block">Public URL</span>
                         <span className="text-xs font-mono font-bold text-indigo-300 truncate block">
-                          readability.ai/@{username || "creator"}
+                          readability.rbaadvisor.com/@{username || "creator"}
                         </span>
                       </div>
                       <button
-                        onClick={() => copyToClipboard(`readability.ai/@${username || "creator"}`, "public-url")}
+                        onClick={() => copyToClipboard(`https://readability.rbaadvisor.com/@${username || "creator"}`, "public-url")}
                         className="p-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-xl text-slate-400 hover:text-white transition cursor-pointer"
                         title="Copy Public Link"
                       >
@@ -2188,7 +2255,7 @@ export default function GrowthHubView({ user, userProfile, onRefreshProfile, ini
                         <div className="aspect-[1.91/1] w-full bg-gradient-to-br from-indigo-900 to-slate-900 rounded-lg p-4 flex flex-col justify-between border border-indigo-500/20 relative overflow-hidden">
                           <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl" />
                           <div className="text-[8px] font-mono text-indigo-400 font-bold uppercase tracking-widest">
-                            readability.cloud
+                            readability.rbaadvisor.com
                           </div>
                           <div>
                             <h4 className="text-xs sm:text-sm font-black text-white leading-tight">

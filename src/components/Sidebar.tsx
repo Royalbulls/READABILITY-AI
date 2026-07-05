@@ -23,9 +23,11 @@ import { User as FirebaseUser } from "../lib/firebase";
 interface SidebarProps {
   user: FirebaseUser | null;
   onSignOut: () => void;
-  activeView: "workspace" | "pricing" | "growth" | "admin" | "business" | "academy" | "search" | "projects";
-  setActiveView: (view: "workspace" | "pricing" | "growth" | "admin" | "business" | "academy" | "search" | "projects") => void;
+  activeView: "workspace" | "pricing" | "growth" | "admin" | "business" | "academy" | "search" | "projects" | "create_earn";
+  setActiveView: (view: "workspace" | "pricing" | "growth" | "admin" | "business" | "academy" | "search" | "projects" | "create_earn") => void;
   userProfile: any;
+  devMode: boolean;
+  setDevMode: (devMode: boolean) => void;
 }
 
 export default function Sidebar({
@@ -33,7 +35,9 @@ export default function Sidebar({
   onSignOut,
   activeView,
   setActiveView,
-  userProfile
+  userProfile,
+  devMode,
+  setDevMode
 }: SidebarProps) {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -42,13 +46,14 @@ export default function Sidebar({
   const totalCredits = userProfile ? userProfile.requestLimit : 5;
 
   const menuItems = [
-    { id: "workspace" as const, label: "Workspace", icon: FileText },
-    { id: "pricing" as const, label: "Subscriptions", icon: CreditCard },
-    { id: "growth" as const, label: "Creator Platform", icon: TrendingUp },
-    { id: "business" as const, label: "📊 Business Studio", icon: BarChart3 },
-    { id: "academy" as const, label: "🎓 Academy 2.0", icon: GraduationCap },
-    { id: "projects" as const, label: "📂 Saved Projects", icon: Folder },
-    { id: "search" as const, label: "🔍 Knowledge OS", icon: Search },
+    { id: "workspace" as const, label: "📄 Understand Documents", icon: FileText },
+    { id: "academy" as const, label: "🎓 Learn Anything", icon: GraduationCap },
+    { id: "business" as const, label: "💼 Business Planner", icon: BarChart3 },
+    { id: "growth" as const, label: "🚀 Grow My Business", icon: TrendingUp },
+    { id: "create_earn" as const, label: "🎨 Create & Earn", icon: Sparkles },
+    { id: "projects" as const, label: "📂 My Projects", icon: Folder },
+    { id: "search" as const, label: "🔍 Search & Learn", icon: Search },
+    { id: "pricing" as const, label: "⚙️ Settings", icon: CreditCard },
   ];
 
   const handleNavClick = (viewId: typeof activeView) => {
@@ -177,6 +182,26 @@ export default function Sidebar({
             </button>
           </div>
         )}
+
+        {/* Developer Mode Toggle */}
+        <div className="flex items-center justify-between p-2.5 bg-slate-900 border border-slate-800 rounded-xl">
+          <div className="flex flex-col text-left">
+            <span className="text-[10px] font-bold text-slate-300">Developer Mode</span>
+            <span className="text-[8px] text-slate-500 font-sans mt-0.5">Show technical terms</span>
+          </div>
+          <button
+            onClick={() => setDevMode(!devMode)}
+            className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+              devMode ? "bg-indigo-600" : "bg-slate-700"
+            }`}
+          >
+            <span
+              className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                devMode ? "translate-x-4" : "translate-x-0"
+              }`}
+            />
+          </button>
+        </div>
 
         {/* Engine Status Tag */}
         <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">

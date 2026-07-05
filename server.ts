@@ -65,6 +65,20 @@ function getGeminiClient(): GoogleGenAI {
   return aiInstance;
 }
 
+// Helper to detect language (Hindi, Bengali, Tamil, Telugu, English)
+function detectLanguage(text: string): string {
+  if (!text) return "en";
+  // Check Devanagari range (Hindi, Marathi, Nepali, etc.)
+  if (/[\u0900-\u097F]/.test(text)) return "hi";
+  // Check Bengali/Assamese range
+  if (/[\u0980-\u09FF]/.test(text)) return "bn";
+  // Check Tamil range
+  if (/[\u0B80-\u0BFF]/.test(text)) return "ta";
+  // Check Telugu range
+  if (/[\u0C00-\u0C7F]/.test(text)) return "te";
+  return "en";
+}
+
 // Resilient helper to handle transient API errors (e.g. 503 High Demand / Spikes) with retry & model fallback
 async function generateContentWithRetryAndFallback(
   client: GoogleGenAI,
@@ -1069,6 +1083,24 @@ CRITICAL OPERATING RULES:
         ];
       }
 
+      // Automatically configure system instruction to respond in user's input language
+      const detectedLang = detectLanguage(text || topic || "");
+      const langNames: Record<string, string> = {
+        hi: "Hindi (हिंदी)",
+        bn: "Bengali (বাংলা)",
+        ta: "Tamil (தமிழ்)",
+        te: "Telugu (తెలుగు)",
+        en: "English"
+      };
+
+      if (detectedLang !== "en") {
+        const langName = langNames[detectedLang] || "the user's input language";
+        systemInstruction += `\n\nCRITICAL MULTILINGUAL MANDATE:\n` +
+          `1. The user's input language is detected as ${langName}. You MUST generate your entire response (all sections, headings, bullets, code blocks, comparison charts, quizzes, and your verdict) natively in ${langName}.\n` +
+          `2. Even if your base persona prompts are defined in English, translate their headers and structural sections (e.g., "The Core Concept", "The Breakdown", "Mr. Kilvish's Verdict", "Executive CA Analysis", "Strategic Roadmap", "Mr. Kilvish's Business Verdict", "The Core Lesson", "The Lesson Breakdown", "Mr. Kilvish's Quiz & Challenge", "The Investor Pitch Review", "The Scale-Up Execution Plan", "Mr. Kilvish's VC Verdict") into ${langName}.\n` +
+          `3. Do NOT respond in English. Keep vital technical/domain terms (e.g. GST, MSME, CAC, LTV) in English or in parentheses next to their translation if useful, but all explanatory sentences must be in fluent, grammatically correct ${langName}.`;
+      }
+
       const parts: any[] = [];
 
       // Add image if present
@@ -1325,18 +1357,19 @@ CRITICAL OPERATING RULES:
       await deductUserCredit(req.user.uid);
 
       const resultText = response.text || "Clarity could not be found. Please try a different input.";
-      res.json({ result: resultText });
+      res.json({ result: resultText, detectedLanguage: detectedLang });
 
     } catch (error: any) {
       console.warn("[Server Simplify] Gemini API call failed or quota exhausted. Falling back to high-fidelity simulation:", error.message);
       
       const { text, mode, topic, persona } = req.body;
+      const detectedLang = detectLanguage(text || topic || "");
       
       // Deduct 1 credit from user for the high-fidelity fallback service
       await deductUserCredit(req.user.uid).catch(() => {});
       
-      const simulatedText = getSimulatedSimplification(text, mode, topic, persona);
-      res.json({ result: simulatedText });
+      const simulatedText = getSimulatedSimplification(text, mode, topic, persona, detectedLang);
+      res.json({ result: simulatedText, detectedLanguage: detectedLang });
     }
   });
 
@@ -1877,13 +1910,27 @@ This document provides a highly structured, readable summary of **${capsTopic}**
     text: string,
     mode: string,
     topic: string,
-    persona: string
+    persona: string,
+    lang?: string
   ): string {
     const subject = topic || (text ? (text.length > 30 ? text.substring(0, 30) + "..." : text) : "the selected topic");
     const capsSubject = subject.charAt(0).toUpperCase() + subject.slice(1);
 
+    let disclaimer = "";
+    if (lang && lang !== "en") {
+      const disclaimers: Record<string, string> = {
+        hi: "> **सिमुलेशन मोड (हिंदी):** यह प्रतिक्रिया सिमुलेशन इंजन के माध्यम से आपके लिए हिंदी में स्थानीयकृत की गई है।\n\n",
+        bn: "> **অনুকরণ মোড (বাংলা):** এই প্রতিক্রিয়াটি বাংলা ভাষায় অনুবাদ করা হয়েছে।\n\n",
+        ta: "> **உருவகப்படுத்துதல் முறை (தமிழ்):** இந்த பதில் தமிழ் மொழியில் மொழிபெயர்க்கப்பட்டுள்ளது.\n\n",
+        te: "> **అనుకరణ మోడ్ (తెలుగు):** ఈ ప్రతిస్పందన తెలుగులో అందించబడింది.\n\n"
+      };
+      disclaimer = disclaimers[lang] || `> **Simulation Mode (${lang.toUpperCase()}):** Response localized to detected language.\n\n`;
+    }
+
+    let result = "";
+
     if (persona === "business_consultant") {
-      return `
+      result = `
 ## Executive CA Analysis
 We have conducted a thorough financial and operational assessment of **${capsSubject}** relative to regional compliance, credit viability, and tax implications under central guidelines. The core structure exhibits solid market alignment, provided that proper initial capital deployment and regulatory registrations are meticulously executed in the early phases.
 
@@ -1907,10 +1954,8 @@ We have conducted a thorough financial and operational assessment of **${capsSub
 **Mr. Kilvish's Business Verdict:**
 **Focus heavily on establishing collateral-free credit lines and optimizing your day-one cash runway. Ensure Udyam registration is completed immediately to qualify for state-level financial subsidies!**
 `.trim();
-    }
-
-    if (persona === "ai_teacher") {
-      return `
+    } else if (persona === "ai_teacher") {
+      result = `
 ## The Core Lesson
 Mastering **${capsSubject}** begins with understanding its core essence rather than getting lost in complex technical details. In simple terms, it represents a structured framework designed to optimize energy, value, or information transfer between multiple active components.
 
@@ -1939,10 +1984,8 @@ At its heart, **${capsSubject}** can be defined as a systematic approach to coor
 **Mr. Kilvish's Quiz & Challenge:**
 **Identify one real-world process in your own daily life that mirrors this system of distributed balance, and write down how you would optimize its hidden feedback loops!**
 `.trim();
-    }
-
-    if (persona === "startup_mentor") {
-      return `
+    } else if (persona === "startup_mentor") {
+      result = `
 ## The Investor Pitch Review
 Analyzing **${capsSubject}** from a venture-scale perspective reveals a compelling core proposition with significant market leverage. To attract institutional seed funding, the project must shift focus from purely technical features toward viral acquisition channels, defensible user retention loops, and clear path-to-profit unit economics.
 
@@ -1965,10 +2008,9 @@ Analyzing **${capsSubject}** from a venture-scale perspective reveals a compelli
 **Mr. Kilvish's VC Verdict:**
 **Focus 100% of your energy on building a super-clean MVP and validating your early user retention metrics. Prove that users love the product before seeking institutional VC funding!**
 `.trim();
-    }
-
-    // Default persona
-    return `
+    } else {
+      // Default persona
+      result = `
 ## Core Concept
 **${capsSubject}** is a framework designed to bring ultimate clarity, efficiency, and structural simplicity to what would otherwise be a complex, jargon-heavy process. Its core focus is on removing unnecessary technical fluff and presenting instructions, concepts, or operations in a digestible, highly practical format.
 
@@ -1989,6 +2031,9 @@ Analyzing **${capsSubject}** from a venture-scale perspective reveals a compelli
 **Mr. Kilvish's Verdict:**
 **Keep your workflows clean, stay focused on core practical outcomes, and never let complex technical jargon cloud your ultimate operational goals!**
 `.trim();
+    }
+
+    return disclaimer + result;
   }
 
   // Vite integration for development vs. production static serving
