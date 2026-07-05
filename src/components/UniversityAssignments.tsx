@@ -6,11 +6,14 @@ import {
   Award, 
   Info,
   CheckCircle,
-  FileDown
+  FileDown,
+  FolderPlus
 } from "lucide-react";
+import SaveToProjectModal from "./SaveToProjectModal";
 
 interface UniversityAssignmentsProps {
   topic: string;
+  user?: any;
   studentAssignmentText: string;
   setStudentAssignmentText: (val: string) => void;
   isGradingAssignment: boolean;
@@ -24,6 +27,7 @@ interface UniversityAssignmentsProps {
 
 export default function UniversityAssignments({
   topic,
+  user,
   studentAssignmentText,
   setStudentAssignmentText,
   isGradingAssignment,
@@ -35,6 +39,7 @@ export default function UniversityAssignments({
   onRefreshProfile
 }: UniversityAssignmentsProps) {
   const [assignmentAttachedName, setAssignmentAttachedName] = useState<string | null>(null);
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
 
   const handleGradeAssignment = () => {
     if (studentAssignmentText.trim().length < 10) return;
@@ -182,6 +187,17 @@ export default function UniversityAssignments({
                 <div className="p-4 bg-white border border-slate-100 rounded-2xl text-xs text-slate-600 leading-relaxed font-sans whitespace-pre-wrap">
                   <strong>Examiner's Feedback</strong>: {assignmentGrade.feedback}
                 </div>
+
+                {user && (
+                  <button
+                    type="button"
+                    onClick={() => setSaveModalOpen(true)}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-white hover:bg-slate-50 text-violet-700 hover:text-violet-800 border border-violet-200 hover:border-violet-300 rounded-xl text-xs font-bold transition duration-200 cursor-pointer shadow-2xs font-mono uppercase"
+                  >
+                    <FolderPlus className="w-4 h-4 text-violet-600" />
+                    <span>Save Grade & Feedback</span>
+                  </button>
+                )}
               </div>
             ) : (
               <div className="text-center py-12 text-slate-400 text-xs font-medium space-y-2">
@@ -201,6 +217,17 @@ export default function UniversityAssignments({
           </div>
         </div>
       </div>
+
+      {user && (
+        <SaveToProjectModal
+          isOpen={saveModalOpen}
+          onClose={() => setSaveModalOpen(false)}
+          userId={user.uid}
+          contentToSave={`### Course Assignment Grade Report 🎓\n\n**Topic**: ${topic || "Artificial Intelligence"}\n\n**Student Submission Draft**:\n${studentAssignmentText}\n\n**Faculty Consolidated Score**: ${assignmentGrade?.score} / 100 (${assignmentGrade?.letter})\n\n**Examiner's Feedback**:\n${assignmentGrade?.feedback}`}
+          defaultCategory="Assignment"
+          defaultTitle={`${topic || "Syllabus"} Grade Feedback`}
+        />
+      )}
     </div>
   );
 }

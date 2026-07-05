@@ -15,15 +15,16 @@ import {
   Search,
   User as UserIcon,
   HelpCircle,
-  Clock
+  Clock,
+  Folder
 } from "lucide-react";
 import { User as FirebaseUser } from "../lib/firebase";
 
 interface SidebarProps {
   user: FirebaseUser | null;
   onSignOut: () => void;
-  activeView: "workspace" | "pricing" | "growth" | "admin" | "business" | "academy" | "search";
-  setActiveView: (view: "workspace" | "pricing" | "growth" | "admin" | "business" | "academy" | "search") => void;
+  activeView: "workspace" | "pricing" | "growth" | "admin" | "business" | "academy" | "search" | "projects";
+  setActiveView: (view: "workspace" | "pricing" | "growth" | "admin" | "business" | "academy" | "search" | "projects") => void;
   userProfile: any;
 }
 
@@ -46,6 +47,7 @@ export default function Sidebar({
     { id: "growth" as const, label: "Creator Platform", icon: TrendingUp },
     { id: "business" as const, label: "📊 Business Studio", icon: BarChart3 },
     { id: "academy" as const, label: "🎓 Academy 2.0", icon: GraduationCap },
+    { id: "projects" as const, label: "📂 Saved Projects", icon: Folder },
     { id: "search" as const, label: "🔍 Knowledge OS", icon: Search },
   ];
 
@@ -73,6 +75,9 @@ export default function Sidebar({
             </div>
             <p className="text-slate-400 text-[11px] mt-1 font-sans leading-relaxed">
               Banish the darkness of jargon with pure clarity.
+            </p>
+            <p className="text-indigo-400/80 text-[9px] mt-1.5 font-sans font-medium tracking-wide uppercase">
+              Powered by Royal Bulls Advisory
             </p>
           </div>
         </div>

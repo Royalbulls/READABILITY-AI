@@ -67,14 +67,22 @@ interface GrowthHubViewProps {
   user: FirebaseUser;
   userProfile: UserProfile | null;
   onRefreshProfile: () => void;
+  initialTab?: "dashboard" | "profile" | "creator" | "marketplace" | "launch" | "earnings" | "referrals" | "admin" |
+    "business-studio" | "academy-integration" | "marketing-studio" | "crm" | "automation" | "analytics" | "enterprise-settings";
 }
 
-export default function GrowthHubView({ user, userProfile, onRefreshProfile }: GrowthHubViewProps) {
+export default function GrowthHubView({ user, userProfile, onRefreshProfile, initialTab }: GrowthHubViewProps) {
   // Navigation tabs in Creator Hub
   const [activeTab, setActiveTab] = useState<
     "dashboard" | "profile" | "creator" | "marketplace" | "launch" | "earnings" | "referrals" | "admin" |
     "business-studio" | "academy-integration" | "marketing-studio" | "crm" | "automation" | "analytics" | "enterprise-settings"
-  >("dashboard");
+  >(initialTab || "dashboard");
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   // General States
   const [copiedText, setCopiedText] = useState<string | null>(null);

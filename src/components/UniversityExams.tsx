@@ -10,7 +10,9 @@ import {
   Play,
   FileText,
   Bookmark,
-  Check
+  Check,
+  Briefcase,
+  ArrowRight
 } from "lucide-react";
 
 interface UniversityExamsProps {
@@ -23,6 +25,7 @@ interface UniversityExamsProps {
   setScore: (val: number) => void;
   setQuizSubmitted: (val: boolean) => void;
   onNavigateTab: (tabId: string) => void;
+  onStartBusiness?: (data: any) => void;
 }
 
 export default function UniversityExams({
@@ -34,7 +37,8 @@ export default function UniversityExams({
   setShowCertificate,
   setScore: setGlobalScore,
   setQuizSubmitted: setGlobalQuizSubmitted,
-  onNavigateTab
+  onNavigateTab,
+  onStartBusiness
 }: UniversityExamsProps) {
   const [examType, setExamType] = useState<"practice" | "final">("practice");
   
@@ -386,12 +390,36 @@ export default function UniversityExams({
                       <p className="text-xs font-semibold text-emerald-600 max-w-md mx-auto">
                         🎉 Congratulations, Scholar! You have exceeded the strict accreditation threshold. Your executive university-style digital certificate is now active inside your vault.
                       </p>
-                      <button
-                        onClick={() => onNavigateTab("certificates")}
-                        className="bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl cursor-pointer"
-                      >
-                        Claim Digital Certificate
-                      </button>
+                      
+                      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                        <button
+                          onClick={() => onNavigateTab("certificates")}
+                          className="w-full sm:w-auto bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl cursor-pointer"
+                        >
+                          Claim Digital Certificate
+                        </button>
+
+                        {onStartBusiness && (
+                          <button
+                            onClick={() => {
+                              onStartBusiness({
+                                topic: currentCourse.title || currentCourse.topic || "Business Foundations",
+                                studentName: "Ramesh Kumar Sharma", // fallback/default
+                                level: selectedLevel,
+                                score: scorePercent
+                              });
+                            }}
+                            className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-6 py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 border border-indigo-500 shadow-md animate-pulse"
+                          >
+                            <Briefcase className="w-4 h-4 text-indigo-200" />
+                            <span>Start Business ➔</span>
+                          </button>
+                        )}
+                      </div>
+
+                      <p className="text-[10px] text-slate-400 font-medium">
+                        Study to Business Pipeline: Automatically transfers all your academic records to the Business Studio!
+                      </p>
                     </div>
                   ) : (
                     <div className="space-y-4">

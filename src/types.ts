@@ -171,4 +171,17 @@ export interface WebhookLogRecord {
   error?: string;
 }
 
+export interface SavedProject {
+  id: string;
+  userId: string;
+  title: string;
+  description?: string;
+  category: string; // e.g. "Simplifier", "Course", "Assignment", "Business Plan", "Startup Roadmap", "Creator OS"
+  content: string; // Markdown or text contents
+  timestamp: number;
+  liked?: boolean;
+  disliked?: boolean;
+}
+
+
 

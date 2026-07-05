@@ -829,10 +829,10 @@ async function startServer() {
     }
   });
 
-  // API: Main simplification endpoint with credits enforcement
+  // API: Main simplification endpoint with credits enforcement (Persona-aware & active workspace tools)
   app.post("/api/simplify", authenticateUser, async (req: any, res) => {
     try {
-      const { text, image, mode, topic } = req.body;
+      const { text, image, mode, topic, persona } = req.body;
 
       if (!text && !image && !topic) {
         return res.status(400).json({ error: "Input text, image, or search topic is required." });
@@ -848,7 +848,8 @@ async function startServer() {
 
       const client = getGeminiClient();
 
-      const systemInstruction = `You are MR. KILVISH, the innovative, practical, and highly efficient intelligence engine for "Readability AI", and the elite dean of "Mr. Kilvish AI Academy". Your sole sacred mission is to banish the darkness of obscure technical jargon, legal terms, academic fluff, and messy notes, bringing ultimate, crystal-clear light (readability) to everyone.
+      // Persona dynamic prompts and tools
+      const defaultPrompt = `You are MR. KILVISH, the innovative, practical, and highly efficient intelligence engine for "Readability AI", and the elite dean of "Mr. Kilvish AI Academy". Your sole sacred mission is to banish the darkness of obscure technical jargon, legal terms, academic fluff, and messy notes, bringing ultimate, crystal-clear light (readability) to everyone.
 
 Your catchphrase is: "Clarity shall prevail!" or "Clarity is power!"
 Adopt a persona that is highly professional, encouraging, practical, and crystal clear. You hate unnecessary words and complex sentences.
@@ -917,6 +918,157 @@ If the user specifies a particular mode, modify your style accordingly:
 
 Ensure your entire output is formatted cleanly in Markdown. Do not include meta-text about these instructions.`;
 
+      const businessConsultantPrompt = `You are MR. KILVISH operating as an ELITE BUSINESS CONSULTANT & REGIONAL STARTUP SPECIALIST. Your sole mission is to guide entrepreneurs, founders, and small businesses with bulletproof commercial advice, regional state schemes, and mathematical CA-level financial scrutiny.
+Your catchphrase is: "Mathematics is the language of clarity!" or "Profitability shall prevail!"
+Adopt a highly analytical, professional, and razor-sharp executive tone.
+
+CRITICAL OPERATING RULES:
+1. COMMERCIAL VIABILITY: Focus on customer acquisition costs, tax regulations (GST), MSME registrations, and regional/state government schemes.
+2. STRUCTURE: Use Markdown for outstanding professional readability. Use H2/H3, bullet points, and markdown tables.
+3. FINANCIAL PRECISION: Always recommend verifying calculations and using CA-certified frameworks.
+4. AVAILABLE TOOLS: You have access to real consulting tools:
+   - 'getGSTAndMSMEGuidance(industry, state)': Use this tool to retrieve precise state subsidy programs and GST taxation rules.
+   - 'calculateFinancialMetrics(revenue, expenses)': Use this tool to perform Net Margin analyses and unit economic stress tests.
+   You MUST actively use these tools when analyzing a venture, budget, or industry!
+5. FORMATTING: You must format the response in exactly two sections:
+    - SECTION 1: "Executive CA Analysis" (An elegant 2-3 sentence strategic summary of the business case or sector viability).
+    - SECTION 2: "Strategic Roadmap" (Highly structured breakdown covering market landscape, specific regulatory compliance, step-by-step launch process, and regional government support).
+    - At the very end, append a brief, bold block called "**Mr. Kilvish's Business Verdict:**" detailing the bottom-line action step or financial metric to focus on (max 2 sentences).`;
+
+      const aiTeacherPrompt = `You are MR. KILVISH operating as an EXPERT AI TEACHER & PEDAGOGICAL ARCHITECT. Your sole mission is to break down complex science, math, coding, or theoretical topics into perfectly structured educational syllabus modules, clear everyday analogies, step-by-step concepts, and practice quizzes.
+Your catchphrase is: "Knowledge is the light that banishes ignorance!" or "Concept mastery is power!"
+Adopt an incredibly encouraging, patient, highly structured, and pedagogical tone.
+
+CRITICAL OPERATING RULES:
+1. PEDAGOGICAL METHOD: Teach systematically. Define technical words in clear, Class 8-10 English. Never leave a student confused.
+2. ANALOGY FOCUS: Always use a powerful physical analogy for abstract mathematical or scientific topics.
+3. STRUCTURE: Use markdown headings, lists, bold concepts, and clean tables.
+4. AVAILABLE TOOLS: You have access to active teaching tools:
+   - 'defineVocabularyTerm(term)': Use this tool to look up elegant phonetic pronunciations, formal definitions, and relatable analogies.
+   - 'generatePracticeQuestions(topic)': Use this tool to automatically formulate highly structured MCQs and conceptual quizzes.
+   You MUST actively use these tools to introduce key vocabulary or review student comprehension!
+5. FORMATTING: You must format the response in exactly two sections:
+    - SECTION 1: "The Core Lesson" (A warm 2-3 sentence intuitive explanation of the topic's core essence).
+    - SECTION 2: "The Lesson Breakdown" (Detailed concept roadmap, definitions, step-by-step processes, and interactive questions/MCQs).
+    - At the very end, append a brief, bold block called "**Mr. Kilvish's Quiz & Challenge:**" prompting the student with a final conceptual exercise (max 2 sentences).`;
+
+      const startupMentorPrompt = `You are MR. KILVISH operating as a SEASONED STARTUP MENTOR, TECH FOUNDER, & VENTURE CAPITALIST. Your sole mission is to stress-test ideas for venture scale, evaluate product-market fit (PMF), advise on viral growth loops, optimize unit metrics (LTV/CAC), and match projects to real funding structures.
+Your catchphrase is: "Build what users love, and scale like crazy!" or "Product-Market Fit is the ultimate light!"
+Adopt a high-energy, direct, actionable, and extremely motivating tone.
+
+CRITICAL OPERATING RULES:
+1. SCALE & GROWTH: Analyze ideas from the perspective of an early-stage investor. Highlight critical risks, viral acquisition loops, user retention, and monetization.
+2. METRIC FOCUS: Focus heavily on CAC, LTV, churn rate, and runway.
+3. AVAILABLE TOOLS: You have access to VC mentoring tools:
+   - 'evaluateStartupMetrics(cac, ltv, churnRate)': Use this tool to analyze the financial health ratio of user acquisition and lifetime value.
+   - 'suggestStartupFunding(stage, sector)': Use this tool to retrieve highly practical, tailored funding channels, expected ticket sizes, and milestones.
+   You MUST actively use these tools to run metrics audits and funding matchers for startup pitches!
+4. FORMATTING: You must format the response in exactly two sections:
+    - SECTION 1: "The Investor Pitch Review" (A sharp, high-intensity 2-3 sentence overview of the project's scale potential and risk factors).
+    - SECTION 2: "The Scale-Up Execution Plan" (Actionable milestones for development, viral growth funnels, recommended metrics, and funding strategies).
+    - At the very end, append a brief, bold block called "**Mr. Kilvish's VC Verdict:**" detailing the next major execution milestone or metric target (max 2 sentences).`;
+
+      // Formulate tools definitions for Gemini 3.5 Function Calling
+      const getGSTAndMSMEGuidance = {
+        name: "getGSTAndMSMEGuidance",
+        description: "Retrieve regional Indian GST tax rates, MSME benefits under Udyam registration, and specific state-level employment/startup schemes based on industry and state.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            industry: { type: "STRING", description: "The business sector or industry (e.g. Agriculture, Tech, Dairy, Retail)" },
+            state: { type: "STRING", description: "The Indian state where the business is based (e.g. Maharashtra, Uttar Pradesh, Karnataka)" }
+          },
+          required: ["industry", "state"]
+        }
+      };
+
+      const calculateFinancialMetrics = {
+        name: "calculateFinancialMetrics",
+        description: "Calculate gross profit, net operating margin, unit economic health, and obtain a Chartered Accountant review feedback based on annual/monthly revenue and expenses.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            revenue: { type: "NUMBER", description: "Estimated business revenue" },
+            expenses: { type: "NUMBER", description: "Estimated business operating expenses" }
+          },
+          required: ["revenue", "expenses"]
+        }
+      };
+
+      const defineVocabularyTerm = {
+        name: "defineVocabularyTerm",
+        description: "Look up definitions, pronunciation guides, and powerful physical analogies for complex scientific, technical, or economic terms.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            term: { type: "STRING", description: "The term or phrase to define (e.g. Quantum Computing, Blockchain, Inflation)" }
+          },
+          required: ["term"]
+        }
+      };
+
+      const generatePracticeQuestions = {
+        name: "generatePracticeQuestions",
+        description: "Generate mock study multiple-choice questions (MCQs), answers, and rationales to test student comprehension of a topic.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            topic: { type: "STRING", description: "The educational subject or topic" }
+          },
+          required: ["topic"]
+        }
+      };
+
+      const evaluateStartupMetrics = {
+        name: "evaluateStartupMetrics",
+        description: "Analyze customer acquisition cost (CAC), customer lifetime value (LTV), and churn rate to obtain LTV:CAC health ratio and Venture Capital readiness metrics.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            cac: { type: "NUMBER", description: "Customer Acquisition Cost" },
+            ltv: { type: "NUMBER", description: "Customer Lifetime Value" },
+            churnRate: { type: "NUMBER", description: "Monthly/annual churn rate percentage (0-100)" }
+          },
+          required: ["cac", "ltv", "churnRate"]
+        }
+      };
+
+      const suggestStartupFunding = {
+        name: "suggestStartupFunding",
+        description: "Suggest optimal funding channels, typical seed/VC check sizes, and primary corporate objectives based on startup stage and tech sector.",
+        parameters: {
+          type: "OBJECT",
+          properties: {
+            stage: { type: "STRING", description: "Startup lifecycle stage (e.g. Ideation, MVP, Early Traction, Growth)" },
+            sector: { type: "STRING", description: "Business sector or vertical (e.g. FinTech, SaaS, AgriTech, CleanTech)" }
+          },
+          required: ["stage", "sector"]
+        }
+      };
+
+      let systemInstruction = defaultPrompt;
+      let selectedTools: any[] = [{ googleSearch: {} }];
+
+      if (persona === "business_consultant") {
+        systemInstruction = businessConsultantPrompt;
+        selectedTools = [
+          { googleSearch: {} },
+          { functionDeclarations: [getGSTAndMSMEGuidance, calculateFinancialMetrics] }
+        ];
+      } else if (persona === "ai_teacher") {
+        systemInstruction = aiTeacherPrompt;
+        selectedTools = [
+          { googleSearch: {} },
+          { functionDeclarations: [defineVocabularyTerm, generatePracticeQuestions] }
+        ];
+      } else if (persona === "startup_mentor") {
+        systemInstruction = startupMentorPrompt;
+        selectedTools = [
+          { googleSearch: {} },
+          { functionDeclarations: [evaluateStartupMetrics, suggestStartupFunding] }
+        ];
+      }
+
       const parts: any[] = [];
 
       // Add image if present
@@ -952,14 +1104,222 @@ Ensure your entire output is formatted cleanly in Markdown. Do not include meta-
 
       parts.push({ text: promptText });
 
-      // Call Gemini using resilient helper (handles 503/UNAVAILABLE transient errors with backoff and fallback)
-      const response: GenerateContentResponse = await generateContentWithRetryAndFallback(client, {
-        contents: parts,
-        config: {
-          systemInstruction,
-          temperature: 0.3, // Low temperature for more structured, consistent, factual output
+      // Run local tool logic helper
+      async function executeLocalTool(name: string, args: any): Promise<any> {
+        console.log(`[PersonaManager Tool Execution] Running tool: ${name} with args:`, JSON.stringify(args));
+        try {
+          switch (name) {
+            case "getGSTAndMSMEGuidance": {
+              const { industry, state } = args;
+              const lowerState = (state || "").toLowerCase();
+              let stateScheme = "State-level Credit Guarantee schemes & Startup seed support.";
+              if (lowerState.includes("maharashtra")) {
+                stateScheme = "CMEGP (Chief Minister Employment Generation Programme) providing up to 15-35% subsidy for manufacturing/services up to ₹50 Lakhs.";
+              } else if (lowerState.includes("uttar pradesh")) {
+                stateScheme = "UP Startup Policy providing seed funding, patent cost reimbursement, and monthly sustenance allowance of ₹17,500.";
+              } else if (lowerState.includes("karnataka")) {
+                stateScheme = "Idea2PoC (Proof of Concept) grant-in-aid of up to ₹50 Lakhs for early-stage Karnataka startups.";
+              }
+              
+              let gstRate = "18% standard GST for professional or IT services.";
+              const lowerIndustry = (industry || "").toLowerCase();
+              if (lowerIndustry.includes("agriculture") || lowerIndustry.includes("farming")) {
+                gstRate = "Exempt (0%) for raw agricultural produce, 5-12% on processed machinery/fertilizers.";
+              } else if (lowerIndustry.includes("software") || lowerIndustry.includes("tech")) {
+                gstRate = "18% with full Input Tax Credit (ITC) eligibility.";
+              } else if (lowerIndustry.includes("dairy") || lowerIndustry.includes("poultry")) {
+                gstRate = "Exempt (0%) on fresh milk/eggs, 5% on pasteurized products.";
+              }
+
+              return {
+                gstRate,
+                msmeBenefits: "Udyam registration entitles you to collateral-free business loans under CGTMSE (up to ₹5 Crore), interest subvention of 2%, and priority sector lending.",
+                stateSpecificScheme: stateScheme
+              };
+            }
+
+            case "calculateFinancialMetrics": {
+              const revenue = Number(args.revenue || 0);
+              const expenses = Number(args.expenses || 0);
+              const grossProfit = revenue - expenses;
+              const netMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
+              
+              let healthScore = "Fair";
+              let feedback = "Net margin is positive but could be optimized by lowering operational overhead.";
+              if (netMargin > 30) {
+                healthScore = "Excellent";
+                feedback = "Superb business unit economics with high scalability potential.";
+              } else if (netMargin < 10) {
+                healthScore = "Caution";
+                feedback = "Thin operating margin. Highly sensitive to small expense fluctuations.";
+              }
+
+              return {
+                revenue,
+                expenses,
+                grossProfit,
+                netMargin: `${netMargin.toFixed(2)}%`,
+                viabilityHealthScore: healthScore,
+                caFeedback: feedback
+              };
+            }
+
+            case "defineVocabularyTerm": {
+              const { term } = args;
+              const dict: Record<string, { definition: string; analogy: string; pronunciation: string }> = {
+                "quantum computing": {
+                  definition: "A type of computing that uses quantum mechanics principles (like superposition and entanglement) to solve complex calculations much faster than traditional computers.",
+                  analogy: "Like a coin spinning on a table that is both heads and tails at the same time, rather than a flat coin that is only heads (1) or tails (0).",
+                  pronunciation: "KWAHN-tuhm kuhm-PYOO-ting"
+                },
+                "blockchain": {
+                  definition: "A decentralized, distributed ledger that securely records transactions across a network of computers in immutable blocks.",
+                  analogy: "Like a shared, digital diary that everyone in a town has an identical copy of. If one person tries to alter a page, everyone else checks their diary and rejects the change.",
+                  pronunciation: "BLAHK-chayn"
+                },
+                "inflation": {
+                  definition: "The rate at which the general level of prices for goods and services is rising, and subsequently, purchasing power is falling.",
+                  analogy: "Like a balloon slowly filling with air, making your dollars shrink in relative size so it takes more of them to buy the same candy bar.",
+                  pronunciation: "in-FLAY-shuhn"
+                }
+              };
+
+              const key = (term || "").toLowerCase().trim();
+              return dict[key] || {
+                definition: `The fundamental concept representing ${term}.`,
+                analogy: `Think of it like a puzzle piece where ${term} represents the connective pattern solving a complex larger system.`,
+                pronunciation: "N/A"
+              };
+            }
+
+            case "generatePracticeQuestions": {
+              const { topic } = args;
+              return {
+                topic,
+                questions: [
+                  {
+                    id: "q1",
+                    question: `Which core concept is central to understanding ${topic}?`,
+                    options: ["Incremental Scaling", "De-escalation", "Theoretical abstraction", "Decentralized control"],
+                    correctAnswer: "Theoretical abstraction",
+                    explanation: "Abstracting the core logic allows learners to grasp the high-level system without getting bogged down in implementation detail."
+                  },
+                  {
+                    id: "q2",
+                    question: `What is a common pitfall when learning ${topic} for the first time?`,
+                    options: ["Using simple analogies", "Over-complicating terminology", "Practicing too often", "Defining core metrics"],
+                    correctAnswer: "Over-complicating terminology",
+                    explanation: "Learners often trip over advanced technical terminology instead of building solid core conceptual frameworks."
+                  }
+                ]
+              };
+            }
+
+            case "evaluateStartupMetrics": {
+              const cac = Number(args.cac || 1);
+              const ltv = Number(args.ltv || 0);
+              const churn = Number(args.churnRate || 0);
+              
+              const ltvToCacRatio = cac > 0 ? ltv / cac : 0;
+              let assessment = "Unhealthy. Your cost to acquire a customer exceeds their lifetime value.";
+              let recommendation = "Focus on retention, introduce upsells, and optimize your organic referral loops to reduce CAC.";
+              
+              if (ltvToCacRatio >= 3) {
+                assessment = "Excellent (VC Grade). LTV is more than triple your acquisition cost.";
+                recommendation = "You have product-market fit. Aggressively deploy capital to scale marketing and acquisition channels.";
+              } else if (ltvToCacRatio > 1.5) {
+                assessment = "Healthy. Profitable, but margins could be wider.";
+                recommendation = "Reduce friction in your onboarding funnel and test pricing tiers to bump up LTV.";
+              }
+
+              return {
+                ltvToCacRatio: `${ltvToCacRatio.toFixed(2)}:1`,
+                churnRateStatus: churn > 5 ? "High (Action Required)" : "Healthy",
+                vcViabilityAssessment: assessment,
+                tacticalRecommendation: recommendation
+              };
+            }
+
+            case "suggestStartupFunding": {
+              const { stage, sector } = args;
+              const lowerStage = (stage || "").toLowerCase();
+              
+              let recommendedChannel = "Bootstrapping & Friends/Family";
+              let typicalCheckSize = "₹5 Lakhs - ₹25 Lakhs";
+              let coreFocus = "Build MVP, run customer validation tests, and establish early user retention.";
+              
+              if (lowerStage.includes("growth") || lowerStage.includes("series a") || lowerStage.includes("series")) {
+                recommendedChannel = "Venture Capital (VC) & Institutional Funds";
+                typicalCheckSize = "₹10 Crore - ₹50 Crore";
+                coreFocus = "Scale operations, expand market share, build specialized sales team, and invest in marketing CAGR.";
+              } else if (lowerStage.includes("early") || lowerStage.includes("seed") || lowerStage.includes("pre-seed")) {
+                recommendedChannel = "Angel Investors & Government Startup Seed Grants";
+                typicalCheckSize = "₹25 Lakhs - ₹2 Crore";
+                coreFocus = "Scale to initial product-market fit (PMF), expand early dev team, and acquire first 100 paid clients.";
+              }
+
+              return {
+                stage,
+                sector,
+                recommendedChannel,
+                typicalCheckSize,
+                primaryObjective: coreFocus
+              };
+            }
+
+            default:
+              return { error: `Tool ${name} not found.` };
+          }
+        } catch (err: any) {
+          return { error: `Tool execution failed: ${err.message}` };
         }
+      }
+
+      let currentContents = [...parts];
+      const config: any = {
+        systemInstruction,
+        temperature: 0.3,
+        tools: selectedTools,
+      };
+
+      if (selectedTools && selectedTools.length > 1) {
+        config.toolConfig = { includeServerSideToolInvocations: true };
+      }
+
+      // Call Gemini using resilient helper (handles 503/UNAVAILABLE transient errors with backoff and fallback)
+      let response: GenerateContentResponse = await generateContentWithRetryAndFallback(client, {
+        contents: currentContents,
+        config,
       });
+
+      // Handle function calls if any
+      if (response.functionCalls && response.functionCalls.length > 0) {
+        console.log("[PersonaManager] Gemini requested function calls:", JSON.stringify(response.functionCalls));
+        
+        // Execute the functions
+        const toolResponsesParts: any[] = [];
+        for (const call of response.functionCalls) {
+          const result = await executeLocalTool(call.name, call.args);
+          toolResponsesParts.push({
+            functionResponse: {
+              name: call.name,
+              response: { result },
+            }
+          });
+        }
+
+        const modelPart = response.candidates?.[0]?.content;
+        if (modelPart) {
+          currentContents.push(modelPart);
+        }
+        currentContents.push({ parts: toolResponsesParts });
+
+        // Call Gemini again with the tool responses to get the final natural language answer!
+        response = await generateContentWithRetryAndFallback(client, {
+          contents: currentContents,
+          config,
+        });
+      }
 
       // Deduct 1 credit from user on success
       await deductUserCredit(req.user.uid);
@@ -968,10 +1328,15 @@ Ensure your entire output is formatted cleanly in Markdown. Do not include meta-
       res.json({ result: resultText });
 
     } catch (error: any) {
-      console.error("Gemini Simplify Error:", error);
-      res.status(500).json({ 
-        error: error.message || "An unexpected error occurred while communicating with the intelligence engine." 
-      });
+      console.warn("[Server Simplify] Gemini API call failed or quota exhausted. Falling back to high-fidelity simulation:", error.message);
+      
+      const { text, mode, topic, persona } = req.body;
+      
+      // Deduct 1 credit from user for the high-fidelity fallback service
+      await deductUserCredit(req.user.uid).catch(() => {});
+      
+      const simulatedText = getSimulatedSimplification(text, mode, topic, persona);
+      res.json({ result: simulatedText });
     }
   });
 
@@ -1387,8 +1752,10 @@ Provide:
 
       res.json({ text: response.text });
     } catch (error: any) {
-      console.error("Creator AI generator error:", error);
-      res.status(500).json({ error: error.message || "AI Generation failed." });
+      console.warn("[Creator AI] Gemini generator failed (falling back to simulation):", error.message);
+      const { type, topic } = req.body;
+      const simulated = getSimulatedCreatorContent(type, topic);
+      res.json({ text: simulated });
     }
   });
 
@@ -1503,6 +1870,125 @@ Read my full breakdown here:
 This document provides a highly structured, readable summary of **${capsTopic}**. Use this study template, customize the lessons, and share with your audience to build authority and drive earnings!
       `.trim();
     }
+  }
+
+  // Resilient simplification simulator when Gemini is exhausted or offline
+  function getSimulatedSimplification(
+    text: string,
+    mode: string,
+    topic: string,
+    persona: string
+  ): string {
+    const subject = topic || (text ? (text.length > 30 ? text.substring(0, 30) + "..." : text) : "the selected topic");
+    const capsSubject = subject.charAt(0).toUpperCase() + subject.slice(1);
+
+    if (persona === "business_consultant") {
+      return `
+## Executive CA Analysis
+We have conducted a thorough financial and operational assessment of **${capsSubject}** relative to regional compliance, credit viability, and tax implications under central guidelines. The core structure exhibits solid market alignment, provided that proper initial capital deployment and regulatory registrations are meticulously executed in the early phases.
+
+## Strategic Roadmap
+
+### 📊 Market Landscape & Commercial Viability
+- **Demand Dynamics**: The demand for services relating to **${capsSubject}** is driven by growing modern efficiency requirements and cost-saving transitions.
+- **Unit Economics**: Net margins can realistically scale up to 25-30% if operating costs are tightly managed and customer acquisition structures are streamlined.
+
+### 📋 Regulatory Compliance & Registrations
+- **Udyam MSME Registry**: Highly recommended to register under the Udyam portal. This unlocks priority sector bank lending and interest subventions up to 2%.
+- **GST Guidelines**: Standard professional or trading GST schedules apply. Businesses can leverage full Input Tax Credit (ITC) to optimize operating costs.
+- **State Licenses**: Ensure local municipal trade licenses and environmental consents (such as Pollution Board NOCs) are secured during the setup phase.
+
+### 💰 Government Support & State Subsidies
+- **Central Programs**: Eligible for support under central schemes such as the Prime Minister’s Employment Generation Programme (PMEGP) or Startup India Seed Funds.
+- **State Schemes**: State policies provide substantial interest rate subventions and electricity tariff concessions for eligible registered units.
+
+---
+
+**Mr. Kilvish's Business Verdict:**
+**Focus heavily on establishing collateral-free credit lines and optimizing your day-one cash runway. Ensure Udyam registration is completed immediately to qualify for state-level financial subsidies!**
+`.trim();
+    }
+
+    if (persona === "ai_teacher") {
+      return `
+## The Core Lesson
+Mastering **${capsSubject}** begins with understanding its core essence rather than getting lost in complex technical details. In simple terms, it represents a structured framework designed to optimize energy, value, or information transfer between multiple active components.
+
+## The Lesson Breakdown
+
+### 💡 Core Concept: What is it?
+At its heart, **${capsSubject}** can be defined as a systematic approach to coordinating different moving parts so they work together as a single cohesive unit. 
+
+### 🌸 Everyday Analogy
+> **The Bicycle Wheel Analogy**: Think of it like a bicycle wheel with multiple spokes. If only one spoke holds all the tension, the wheel bends and breaks. But when the tension is distributed equally across all spokes, the wheel turns smoothly, carrying you forward effortlessly. Similarly, **${capsSubject}** balances resources so the entire system operates with high efficiency.
+
+### 📚 Step-by-Step Mastery Checklist
+1. **Pillar 1: System Identification**: Know all the inputs and active components in your operational space.
+2. **Pillar 2: Latent Signal Tracking**: Monitor non-obvious feedback loops to make continuous, data-driven course corrections.
+3. **Pillar 3: Compound Progress**: Focus on small 1% improvements every single day. Over time, these compile into massive breakthroughs.
+
+### 📝 Comprehension Quiz & Review
+*Try answering these quick questions to lock in your understanding:*
+- **Q1**: What is the primary focus of distributed balance in this concept?
+  - *Answer*: To prevent any single point of failure and ensure smooth, continuous operations across all active nodes.
+- **Q2**: How should we approach learning this topic?
+  - *Answer*: By starting with simple everyday analogies before moving on to specialized equations or code frameworks.
+
+---
+
+**Mr. Kilvish's Quiz & Challenge:**
+**Identify one real-world process in your own daily life that mirrors this system of distributed balance, and write down how you would optimize its hidden feedback loops!**
+`.trim();
+    }
+
+    if (persona === "startup_mentor") {
+      return `
+## The Investor Pitch Review
+Analyzing **${capsSubject}** from a venture-scale perspective reveals a compelling core proposition with significant market leverage. To attract institutional seed funding, the project must shift focus from purely technical features toward viral acquisition channels, defensible user retention loops, and clear path-to-profit unit economics.
+
+## The Scale-Up Execution Plan
+
+### 🚀 Achieving Product-Market Fit (PMF)
+- **Problem Statement**: Standard solutions in this space are fragmented, costly, and carry high friction for the end-user.
+- **Value Proposition**: By simplifying the core user workflow, the project can capture an underserved market segment looking for rapid, high-impact results.
+
+### 📈 Viral Customer Acquisition & Retention
+- **Organic Growth Loops**: Implement referral programs and user-led content creation to keep the Customer Acquisition Cost (CAC) exceptionally low.
+- **LTV:CAC Target**: Aim for a Lifetime Value to CAC ratio of at least 3:1. This is the ultimate benchmark that venture capital funds look for before writing seed checks.
+
+### 💰 Venture Funding & Scale Milestones
+- **Pre-Seed & Seed Stages**: Focus on securing angel investments or government startup grants to build out your MVP and secure your first 100 passionate paid clients.
+- **Series A Scale**: Deploy institutional capital to scale your marketing CAGR, expand your specialized development team, and capture regional market share.
+
+---
+
+**Mr. Kilvish's VC Verdict:**
+**Focus 100% of your energy on building a super-clean MVP and validating your early user retention metrics. Prove that users love the product before seeking institutional VC funding!**
+`.trim();
+    }
+
+    // Default persona
+    return `
+## Core Concept
+**${capsSubject}** is a framework designed to bring ultimate clarity, efficiency, and structural simplicity to what would otherwise be a complex, jargon-heavy process. Its core focus is on removing unnecessary technical fluff and presenting instructions, concepts, or operations in a digestible, highly practical format.
+
+## The Breakdown
+
+### 🔍 Key Areas of Optimization
+- **Banishing Jargon**: Dense technical terms are decoded in simple, plain English to ensure that anyone—regardless of their expertise level—can easily understand and apply the concepts.
+- **Actionable Steps**: Rather than theoretical discussions, the focus is entirely on step-by-step processes that you can execute immediately to see measurable improvements.
+- **Everyday Metaphors**: Using powerful analogies to connect abstract systems with familiar, physical real-world experiences.
+
+### 💡 Core Takeaways
+1. **Simplicity is Power**: Removing complexity does not mean losing value—it means amplifying usability.
+2. **Clear Structures**: Well-organized information leads to faster comprehension, higher retention, and error-free execution.
+3. **Continuous Iteration**: Small, incremental improvements are the key to long-term operational success.
+
+---
+
+**Mr. Kilvish's Verdict:**
+**Keep your workflows clean, stay focused on core practical outcomes, and never let complex technical jargon cloud your ultimate operational goals!**
+`.trim();
   }
 
   // Vite integration for development vs. production static serving

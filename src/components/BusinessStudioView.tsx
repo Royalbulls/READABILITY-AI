@@ -34,9 +34,12 @@ import {
   Calculator,
   Gauge,
   Landmark,
-  User
+  User,
+  Rocket,
+  FolderPlus
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import SaveToProjectModal from "./SaveToProjectModal";
 
 const INDIA_STATES_AND_DISTRICTS: Record<string, string[]> = {
   "Andaman and Nicobar Islands": ["Port Blair", "North and Middle Andaman", "South Andaman", "Nicobar"],
@@ -82,13 +85,17 @@ interface BusinessStudioViewProps {
   userProfile: any;
   onRefreshProfile: () => void;
   setActiveView: (view: "workspace" | "pricing" | "growth" | "admin" | "business" | "academy" | "search") => void;
+  pipelineBusinessData?: any;
+  clearPipelineBusinessData?: () => void;
 }
 
 export default function BusinessStudioView({ 
   user, 
   userProfile, 
   onRefreshProfile,
-  setActiveView
+  setActiveView,
+  pipelineBusinessData,
+  clearPipelineBusinessData
 }: BusinessStudioViewProps) {
   // Input Selection States
   const [inputType, setInputType] = useState<string>("idea");
@@ -189,6 +196,7 @@ export default function BusinessStudioView({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<any | null>(null);
+  const [saveModalOpen, setSaveModalOpen] = useState<boolean>(false);
   const [activeSection, setActiveSection] = useState<string>("summary");
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [editedContent, setEditedContent] = useState<string>("");
@@ -225,6 +233,65 @@ export default function BusinessStudioView({
 
   // File Upload Reference
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // STUDY TO BUSINESS PIPELINE - Auto-transfer learning data!
+  useEffect(() => {
+    if (pipelineBusinessData) {
+      const { topic: courseTopic, studentName, level, score } = pipelineBusinessData;
+      
+      let inferredIndustry = "Agriculture";
+      let inferredTopic = "Sustainable Dairy & Organic Agribusiness Farm";
+      let inferredCompanyName = `${studentName.split(" ")[0]} Organic Ventures Pvt Ltd`;
+      let inferredBudgetAmount = 1500000;
+      let inferredBudgetRange = "Medium (₹10-50 Lakhs)";
+
+      if (courseTopic.toLowerCase().includes("quantum")) {
+        inferredIndustry = "Technology & IT";
+        inferredTopic = "Quantum-Safe Corporate Cryptography & Security Consulting Agency";
+        inferredCompanyName = `${studentName.split(" ")[0]} Quantum Tech Labs`;
+        inferredBudgetAmount = 2500000;
+        inferredBudgetRange = "Medium (₹10-50 Lakhs)";
+      } else if (courseTopic.toLowerCase().includes("artificial") || courseTopic.toLowerCase().includes("ai")) {
+        inferredIndustry = "Technology & IT";
+        inferredTopic = "Enterprise Artificial Intelligence Consultancy & Customized LLM Studio";
+        inferredCompanyName = `${studentName.split(" ")[0]} Cognitive Systems`;
+        inferredBudgetAmount = 1200000;
+        inferredBudgetRange = "Medium (₹10-50 Lakhs)";
+      } else if (courseTopic.toLowerCase().includes("gst") || courseTopic.toLowerCase().includes("regulatory") || courseTopic.toLowerCase().includes("compliance")) {
+        inferredIndustry = "Financial Services";
+        inferredTopic = "SME GST Regulatory Filing, CMA Formulation, & Audit Advisory Firm";
+        inferredCompanyName = `${studentName.split(" ")[0]} Tax & Corporate Associates`;
+        inferredBudgetAmount = 500000;
+        inferredBudgetRange = "Small (₹5-10 Lakhs)";
+      }
+
+      setTopic(inferredTopic);
+      setCompanyName(inferredCompanyName);
+      setIndustry(inferredIndustry);
+      setApplicantName(studentName);
+      setBudgetAmount(inferredBudgetAmount);
+      setBudget(inferredBudgetRange);
+      setApplicantState("Madhya Pradesh");
+      setApplicantDistrict("Bhopal");
+      setEducationQualification(`${level} Academy Graduate (Score: ${score}%)`);
+      setBusinessExperience(2);
+      
+      // Auto-populate Financials accordingly
+      setOwnInvestment(Math.round(inferredBudgetAmount * 0.3));
+      setLoanRequirement(Math.round(inferredBudgetAmount * 0.7));
+      setWorkingCapital(Math.round(inferredBudgetAmount * 0.15));
+      setMonthlyExpenses(Math.round(inferredBudgetAmount * 0.08));
+      setProjectedAnnualRevenue(Math.round(inferredBudgetAmount * 1.8));
+
+      // Display an encouraging toast message or alert if needed
+      setSuccessMsg(`🚀 STUDY TO BUSINESS PIPELINE ACTIVE! Successfully transferred all learning records for "${courseTopic}" (${score}% score) into your Business profile. No manual entry required!`);
+      setTimeout(() => setSuccessMsg(""), 10000);
+
+      if (clearPipelineBusinessData) {
+        clearPipelineBusinessData();
+      }
+    }
+  }, [pipelineBusinessData, clearPipelineBusinessData]);
 
   const calculateLoanDetails = () => {
     const P = loanRequirement;
@@ -2526,6 +2593,26 @@ ${(ca.missingDocuments || []).length > 0
 
               <div className="flex flex-wrap items-center gap-2">
                 <button
+                  type="button"
+                  onClick={() => setActiveView("growth")}
+                  className="flex items-center gap-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer border border-emerald-500 shadow-md shadow-emerald-600/20 animate-pulse"
+                >
+                  <Rocket className="w-3.5 h-3.5 text-emerald-200" />
+                  <span>Launch Business</span>
+                </button>
+
+                {user && (
+                  <button
+                    type="button"
+                    onClick={() => setSaveModalOpen(true)}
+                    className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white px-3.5 py-1.5 rounded-lg text-xs font-bold cursor-pointer border border-transparent shadow-sm"
+                  >
+                    <FolderPlus className="w-3.5 h-3.5 text-violet-200" />
+                    <span>Save to Project</span>
+                  </button>
+                )}
+
+                <button
                   onClick={handlePrintPDF}
                   className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer"
                 >
@@ -3245,6 +3332,17 @@ ${(ca.missingDocuments || []).length > 0
             </div>
           ))}
         </div>
+      )}
+
+      {user && report && (
+        <SaveToProjectModal
+          isOpen={saveModalOpen}
+          onClose={() => setSaveModalOpen(false)}
+          userId={user.uid}
+          contentToSave={`# ${report.title || "Enterprise Business Plan"}\n\n## Executive Summary\n${report.executiveSummary || ""}\n\n## Business Overview\n${report.businessOverview || ""}\n\n## Business Model\n${report.businessModel || ""}\n\n## Problems & Solution\n${report.problemStatement || ""}\n\n${report.solution || ""}\n\n## CA Audit & Compliance\n${report.legalRequirements?.governmentSchemes || ""}`}
+          defaultCategory="Business Plan"
+          defaultTitle={`${report.title || "Business Plan Outline"}`}
+        />
       )}
     </div>
   );

@@ -40,12 +40,14 @@ import UniversityCertificates from "./UniversityCertificates";
 import UniversityCareerCenter from "./UniversityCareerCenter";
 import UniversityDownloads from "./UniversityDownloads";
 import UniversityBusinessHub from "./UniversityBusinessHub";
+import AllInOneExamCentre from "./AllInOneExamCentre";
 
 interface AcademyViewProps {
   user: any;
   userProfile: any;
   onRefreshProfile: () => void;
   setActiveView: (view: "workspace" | "pricing" | "growth" | "admin" | "business" | "academy" | "search") => void;
+  onStartBusiness?: (data: any) => void;
 }
 
 type UniversityTab = 
@@ -56,6 +58,7 @@ type UniversityTab =
   | "assignments" 
   | "practice-tests" 
   | "final-exams" 
+  | "exam-centre"
   | "certificates" 
   | "downloads" 
   | "career-center" 
@@ -66,7 +69,8 @@ export default function AcademyView({
   user, 
   userProfile, 
   onRefreshProfile,
-  setActiveView
+  setActiveView,
+  onStartBusiness
 }: AcademyViewProps) {
   // System States
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -593,6 +597,7 @@ export default function AcademyView({
             { id: "assignments", label: "Assignments", icon: FileText },
             { id: "practice-tests", label: "Practice Tests", icon: Target },
             { id: "final-exams", label: "Final Exams", icon: ShieldCheck },
+            { id: "exam-centre", label: "Exam Centre 🏆", icon: Trophy },
             { id: "certificates", label: "Certificates", icon: Award },
             { id: "downloads", label: "Downloads", icon: Download },
             { id: "career-center", label: "Career Center", icon: TrendingUp },
@@ -684,6 +689,7 @@ export default function AcademyView({
         {activeTab === "assignments" && (
           <UniversityAssignments
             topic={topic}
+            user={user}
             studentAssignmentText={studentAssignmentText}
             setStudentAssignmentText={setStudentAssignmentText}
             isGradingAssignment={isGradingAssignment}
@@ -707,6 +713,7 @@ export default function AcademyView({
             setScore={setScore}
             setQuizSubmitted={setQuizSubmitted}
             onNavigateTab={(id) => setActiveTab(id as any)}
+            onStartBusiness={onStartBusiness}
           />
         )}
 
@@ -721,6 +728,18 @@ export default function AcademyView({
             setScore={setScore}
             setQuizSubmitted={setQuizSubmitted}
             onNavigateTab={(id) => setActiveTab(id as any)}
+            onStartBusiness={onStartBusiness}
+          />
+        )}
+
+        {activeTab === "exam-centre" && (
+          <AllInOneExamCentre
+            user={user}
+            userXP={userXP}
+            setUserXP={setUserXP}
+            studentName={studentName}
+            onNavigateTab={(id) => setActiveTab(id as any)}
+            onStartBusiness={onStartBusiness}
           />
         )}
 

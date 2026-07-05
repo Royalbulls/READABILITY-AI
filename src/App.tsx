@@ -3,6 +3,7 @@ import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
 import MrKilvishAvatar from "./components/MrKilvishAvatar";
 import ModeSelector from "./components/ModeSelector";
+import PersonaManager, { PersonaType } from "./components/PersonaManager";
 import ExamplesHistoryPanel from "./components/ExamplesHistoryPanel";
 import OutputDisplay from "./components/OutputDisplay";
 import LocalizedErrorBoundary from "./components/ErrorBoundary";
@@ -13,6 +14,7 @@ import GrowthHubView from "./components/GrowthHubView";
 import BusinessStudioView from "./components/BusinessStudioView";
 import AcademyView from "./components/AcademyView";
 import UniversalSearchView from "./components/UniversalSearchView";
+import ProjectsHubView from "./components/ProjectsHubView";
 import ComplianceModal from "./components/ComplianceModal";
 import { InputHistoryItem, SimplificationMode, UserProfile } from "./types";
 import { 
@@ -54,9 +56,13 @@ export default function App() {
   // Authentication states
   const [user, setUser] = useState<User | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [activeView, setActiveView] = useState<"workspace" | "pricing" | "growth" | "admin" | "business" | "academy" | "search">("workspace");
+  const [activeView, setActiveView] = useState<"workspace" | "pricing" | "growth" | "admin" | "business" | "academy" | "search" | "projects">("workspace");
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [complianceTab, setComplianceTab] = useState<"privacy" | "terms" | "refund" | "contact" | "about" | null>(null);
+
+  // Pipeline & tab synchronization states
+  const [pipelineBusinessData, setPipelineBusinessData] = useState<any>(null);
+  const [growthHubInitialTab, setGrowthHubInitialTab] = useState<"dashboard" | "profile" | "creator" | "marketplace" | "launch" | "earnings" | "referrals" | "admin" | "business-studio" | "academy-integration" | "marketing-studio" | "crm" | "automation" | "analytics" | "enterprise-settings">("dashboard");
 
   // Input form states
   const [inputTab, setInputTab] = useState<"simplify" | "search">("simplify");
@@ -64,6 +70,7 @@ export default function App() {
   const [inputText, setInputText] = useState("");
   const [inputTitle, setInputTitle] = useState("");
   const [mode, setMode] = useState<SimplificationMode>("default");
+  const [activePersona, setActivePersona] = useState<PersonaType>("default");
   
   // File upload states
   const [fileName, setFileName] = useState("");
@@ -109,7 +116,7 @@ export default function App() {
     // Check URL parameters for direct view routing (e.g., after payment redirect)
     const urlParams = new URLSearchParams(window.location.search);
     const viewParam = urlParams.get("view");
-    if (viewParam && ["workspace", "pricing", "growth", "admin", "business", "academy", "search"].includes(viewParam)) {
+    if (viewParam && ["workspace", "pricing", "growth", "admin", "business", "academy", "search", "projects"].includes(viewParam)) {
       setActiveView(viewParam as any);
     }
 
@@ -466,6 +473,7 @@ export default function App() {
     try {
       const payload: any = {
         mode: mode,
+        persona: activePersona,
       };
 
       if (isSearchMode) {
@@ -591,6 +599,47 @@ export default function App() {
 
       {/* Main Content Pane */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
+        {/* Global Unified Ecosystem Steps Navigation */}
+        <div className="bg-slate-900 text-white p-3.5 border-b border-slate-800 flex items-center justify-center sticky top-0 z-10 shadow-md">
+          {/* 5-Step Connected Pipeline Tracker */}
+          <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto max-w-full">
+            {[
+              { step: 1, label: "Learn", desc: "AI Academy", view: "academy", tab: "dashboard", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
+              { step: 2, label: "Build", desc: "Business Studio", view: "business", tab: "dashboard", color: "text-violet-400 bg-violet-500/10 border-violet-500/20" },
+              { step: 3, label: "Launch", desc: "Launch Product", view: "growth", tab: "launch", color: "text-sky-400 bg-sky-500/10 border-sky-500/20" },
+              { step: 4, label: "Earn", desc: "Marketplace", view: "growth", tab: "marketplace", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
+              { step: 5, label: "Scale", desc: "Analytics & CRM", view: "growth", tab: "analytics", color: "text-pink-400 bg-pink-500/10 border-pink-500/20" },
+            ].map((s) => {
+              // Determine active status
+              const isActive = activeView === s.view && (s.view !== "growth" || growthHubInitialTab === s.tab);
+              return (
+                <button
+                  key={s.step}
+                  onClick={() => {
+                    setActiveView(s.view as any);
+                    if (s.view === "growth") {
+                      setGrowthHubInitialTab(s.tab as any);
+                    }
+                  }}
+                  className={`px-3 py-1.5 rounded-xl border transition-all duration-200 cursor-pointer flex items-center gap-2 text-left shrink-0 ${
+                    isActive
+                      ? "bg-slate-800 border-slate-750 shadow-sm scale-105"
+                      : "border-transparent opacity-65 hover:opacity-100 hover:bg-slate-900"
+                  }`}
+                >
+                  <div className={`w-5 h-5 rounded-lg flex items-center justify-center text-[10px] font-black border ${s.color}`}>
+                    {s.step}
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-black tracking-tight leading-none text-white">{s.label}</div>
+                    <div className="text-[8px] text-slate-400 font-mono tracking-wider font-semibold mt-0.5">{s.desc}</div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Main Workspace Layout or Billing or Admin */}
         {activeView === "pricing" && user ? (
           <PricingWalletView 
@@ -603,6 +652,7 @@ export default function App() {
             user={user}
             userProfile={userProfile}
             onRefreshProfile={() => fetchUserProfile(user)}
+            initialTab={growthHubInitialTab}
           />
         ) : activeView === "business" && user ? (
           <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col items-center">
@@ -611,6 +661,8 @@ export default function App() {
               userProfile={userProfile}
               onRefreshProfile={() => fetchUserProfile(user)}
               setActiveView={setActiveView}
+              pipelineBusinessData={pipelineBusinessData}
+              clearPipelineBusinessData={() => setPipelineBusinessData(null)}
             />
           </div>
         ) : activeView === "academy" && user ? (
@@ -620,6 +672,10 @@ export default function App() {
               userProfile={userProfile}
               onRefreshProfile={() => fetchUserProfile(user)}
               setActiveView={setActiveView}
+              onStartBusiness={(data) => {
+                setPipelineBusinessData(data);
+                setActiveView("business");
+              }}
             />
           </div>
         ) : activeView === "search" ? (
@@ -631,16 +687,27 @@ export default function App() {
               setActiveView={setActiveView}
             />
           </div>
+        ) : activeView === "projects" && user ? (
+          <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col items-center">
+            <ProjectsHubView
+              user={user}
+              onRefreshProfile={() => fetchUserProfile(user)}
+              setActiveView={setActiveView}
+            />
+          </div>
         ) : activeView === "admin" && user && userProfile?.role === "admin" ? (
           <AdminConsoleView user={user} />
         ) : (
-          <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-5 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         
         {/* Left Column (Controls & Forms): Width 5 columns on desktop */}
-        <div className="lg:col-span-5 flex flex-col gap-6 h-full">
+        <div className="lg:col-span-5 flex flex-col gap-4 h-full">
           
           {/* Mr. Kilvish Persona Widget */}
           <MrKilvishAvatar status={kilvishStatus} />
+
+          {/* Persona Manager */}
+          <PersonaManager activePersona={activePersona} onPersonaChange={setActivePersona} />
 
           {/* Core Input Panel */}
           <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5 flex flex-col gap-5">
@@ -890,13 +957,14 @@ export default function App() {
         </div>
 
         {/* Right Column (Output Display & Visualizer): Width 7 columns on desktop */}
-        <div className="lg:col-span-7 flex flex-col gap-6 h-full">
+        <div className="lg:col-span-7 flex flex-col gap-4 h-full">
           
           {/* Main output terminal */}
           <LocalizedErrorBoundary>
             <OutputDisplay 
               text={output} 
               isLoading={isLoading} 
+              user={user}
               onSpeechStateChange={(isSpeaking) => {
                 setKilvishStatus(isSpeaking ? "speaking" : "idle");
               }}
