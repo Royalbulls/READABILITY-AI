@@ -1,22 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import Header from "./components/Header";
-import Sidebar from "./components/Sidebar";
 import MrKilvishAvatar from "./components/MrKilvishAvatar";
 import ModeSelector from "./components/ModeSelector";
-import PersonaManager, { PersonaType } from "./components/PersonaManager";
 import ExamplesHistoryPanel from "./components/ExamplesHistoryPanel";
 import OutputDisplay from "./components/OutputDisplay";
-import LocalizedErrorBoundary from "./components/ErrorBoundary";
-import LandingPage from "./components/LandingPage";
-import PricingWalletView from "./components/PricingWalletView";
-import AdminConsoleView from "./components/AdminConsoleView";
-import GrowthHubView from "./components/GrowthHubView";
-import BusinessStudioView from "./components/BusinessStudioView";
-import AcademyView from "./components/AcademyView";
-import UniversalSearchView from "./components/UniversalSearchView";
-import ProjectsHubView from "./components/ProjectsHubView";
-import ComplianceModal from "./components/ComplianceModal";
-import { InputHistoryItem, SimplificationMode, UserProfile } from "./types";
+import { InputHistoryItem, SimplificationMode } from "./types";
 import { 
   Upload, 
   X, 
@@ -31,17 +19,6 @@ import {
   Search,
   Infinity
 } from "lucide-react";
-import { 
-  auth, 
-  googleProvider, 
-  fetchUserHistory, 
-  saveUserHistoryItem, 
-  saveUserHistoryItemsBatch,
-  deleteUserHistoryItem, 
-  clearUserHistory,
-  User
-} from "./lib/firebase";
-import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 
 const TOPIC_SUGGESTIONS = [
   "Quantum Computing",
@@ -53,24 +30,12 @@ const TOPIC_SUGGESTIONS = [
 ];
 
 export default function App() {
-  // Authentication states
-  const [user, setUser] = useState<User | null>(null);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
-  const [activeView, setActiveView] = useState<"workspace" | "pricing" | "growth" | "admin" | "business" | "academy" | "search" | "projects" | "create_earn">("workspace");
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [complianceTab, setComplianceTab] = useState<"privacy" | "terms" | "refund" | "contact" | "about" | null>(null);
-
-  // Pipeline & tab synchronization states
-  const [pipelineBusinessData, setPipelineBusinessData] = useState<any>(null);
-  const [growthHubInitialTab, setGrowthHubInitialTab] = useState<"dashboard" | "profile" | "creator" | "marketplace" | "launch" | "earnings" | "referrals" | "admin" | "business-studio" | "academy-integration" | "marketing-studio" | "crm" | "automation" | "analytics" | "enterprise-settings">("dashboard");
-
   // Input form states
   const [inputTab, setInputTab] = useState<"simplify" | "search">("simplify");
   const [searchTopic, setSearchTopic] = useState("");
   const [inputText, setInputText] = useState("");
   const [inputTitle, setInputTitle] = useState("");
   const [mode, setMode] = useState<SimplificationMode>("default");
-  const [activePersona, setActivePersona] = useState<PersonaType>("default");
   
   // File upload states
   const [fileName, setFileName] = useState("");
@@ -79,9 +44,7 @@ export default function App() {
   const [imageMimeType, setImageMimeType] = useState<string | null>(null);
   
   // App system states
-  const [devMode, setDevMode] = useState(false);
   const [output, setOutput] = useState("");
-  const [detectedLanguage, setDetectedLanguage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [kilvishStatus, setKilvishStatus] = useState<"idle" | "loading" | "speaking">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -92,131 +55,25 @@ export default function App() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchUserProfile = async (currentUser: User) => {
-    try {
-      const idToken = await currentUser.getIdToken();
-      
-      // Check if referredBy code is in URL
-      const params = new URLSearchParams(window.location.search);
-      const refCode = params.get("ref");
-      const url = refCode ? `/api/user/profile?referredBy=${refCode}` : "/api/user/profile";
-
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${idToken}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setUserProfile(data);
-      }
-    } catch (err) {
-      console.error("Failed to load user profile:", err);
-    }
-  };
-
-  // Load history from localStorage on mount & sync with Firebase on auth changes
+  // Load history from localStorage on mount
   useEffect(() => {
-    // Check URL parameters for direct view routing (e.g., after payment redirect)
-    const urlParams = new URLSearchParams(window.location.search);
-    const viewParam = urlParams.get("view");
-    if (viewParam && ["workspace", "pricing", "growth", "admin", "business", "academy", "search", "projects"].includes(viewParam)) {
-      setActiveView(viewParam as any);
+    try {
+      const stored = localStorage.getItem("readability_ai_history_v2");
+      if (stored) {
+        setHistory(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.error("Failed to load local logs:", e);
     }
-
-    let unsubscribe = () => {};
-    
-    setIsAuthLoading(true);
-    unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      // Load local history immediately so the UI is responsive from the start
-      try {
-        const localStored = localStorage.getItem("readability_ai_history_v2");
-        if (localStored) {
-          setHistory(JSON.parse(localStored));
-        } else {
-          setHistory([]);
-        }
-      } catch (e) {
-        console.error("Failed to load local logs:", e);
-      }
-
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        setIsAuthLoading(false); // Unblock the UI immediately once user is determined
-        
-        // Fetch user wallet, credits, and role profile
-        fetchUserProfile(firebaseUser);
-
-        // Perform firestore cloud history fetch and synchronization in the background
-        try {
-          const cloudHistory = await fetchUserHistory(firebaseUser.uid);
-          const localStored = localStorage.getItem("readability_ai_history_v2");
-          const localItems: InputHistoryItem[] = localStored ? JSON.parse(localStored) : [];
-          
-          if (localItems.length > 0) {
-            const cloudIds = new Set(cloudHistory.map(item => item.id));
-            const itemsToSync = localItems.filter(item => item && item.id && !cloudIds.has(item.id));
-            
-            if (itemsToSync.length > 0) {
-              const uniqueToSyncMap = new Map<string, InputHistoryItem>();
-              itemsToSync.forEach(item => {
-                uniqueToSyncMap.set(item.id, item);
-              });
-              const uniqueItemsToSync = Array.from(uniqueToSyncMap.values());
-
-              try {
-                await saveUserHistoryItemsBatch(firebaseUser.uid, uniqueItemsToSync);
-              } catch (e) {
-                console.error("Error batch syncing items to firestore:", e);
-              }
-
-              const mergedHistory = await fetchUserHistory(firebaseUser.uid);
-              setHistory(mergedHistory);
-              localStorage.setItem("readability_ai_history_v2", JSON.stringify(mergedHistory));
-            } else {
-              setHistory(cloudHistory);
-              localStorage.setItem("readability_ai_history_v2", JSON.stringify(cloudHistory));
-            }
-          } else {
-            setHistory(cloudHistory);
-            localStorage.setItem("readability_ai_history_v2", JSON.stringify(cloudHistory));
-          }
-        } catch (err) {
-          console.error("Error loading user cloud history:", err);
-        }
-      } else {
-        setUser(null);
-        setUserProfile(null);
-        setActiveView("workspace");
-        setIsAuthLoading(false); // Unblock the UI immediately for guests / landing page
-      }
-    });
-
-    return () => unsubscribe();
   }, []);
 
-  // Auth helper methods
-  const handleSignIn = async () => {
-    setIsAuthLoading(true);
-    setError(null);
+  // Save history to localStorage whenever it changes
+  const saveHistory = (updatedHistory: InputHistoryItem[]) => {
     try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (err: any) {
-      console.error("Authentication error:", err);
-      setError("Failed to sign in with Google: " + (err.message || "Unknown error"));
-    } finally {
-      setIsAuthLoading(false);
-    }
-  };
-
-  const handleSignOut = async () => {
-    setIsAuthLoading(true);
-    setError(null);
-    try {
-      await signOut(auth);
-    } catch (err: any) {
-      console.error("Signout error:", err);
-      setError("Failed to sign out: " + err.message);
-    } finally {
-      setIsAuthLoading(false);
+      setHistory(updatedHistory);
+      localStorage.setItem("readability_ai_history_v2", JSON.stringify(updatedHistory));
+    } catch (e) {
+      console.error("Failed to persist logs:", e);
     }
   };
 
@@ -270,26 +127,11 @@ export default function App() {
     setError(null);
   };
 
-  const handleClearHistory = async () => {
-    const confirmMsg = user 
-      ? "Are you sure you want to clear all your saved clarity logs from both Cloud and local storage?"
-      : "Are you sure you want to clear your saved clarity logs from your local workspace?";
-
-    if (confirm(confirmMsg)) {
-      setHistory([]);
-      localStorage.removeItem("readability_ai_history_v2");
-      
-      if (user) {
-        try {
-          await clearUserHistory(user.uid, history);
-        } catch (dbErr: any) {
-          console.error("Firestore clear error:", dbErr);
-          setError("Failed to clear cloud history: " + (dbErr.message || "Unknown error"));
-        }
-      }
+  const handleClearHistory = () => {
+    if (confirm("Are you sure you want to clear your saved clarity logs?")) {
+      saveHistory([]);
     }
   };
-
 
   // Parse attached files
   const processFile = (file: File) => {
@@ -299,70 +141,23 @@ export default function App() {
     const type = file.type;
 
     if (type.startsWith("image/")) {
-      // Image parsing for OCR + simplification via multimodal Gemini with client-side scaling/optimization
+      // Image parsing for OCR + simplification via multimodal Gemini
       const reader = new FileReader();
       reader.onload = (e) => {
-        const rawDataUrl = e.target?.result as string;
-        const img = new Image();
-        img.onload = () => {
-          // Target max dimension
-          const MAX_DIM = 1200;
-          let width = img.width;
-          let height = img.height;
-
-          if (width > MAX_DIM || height > MAX_DIM) {
-            if (width > height) {
-              height = Math.round((height * MAX_DIM) / width);
-              width = MAX_DIM;
-            } else {
-              width = Math.round((width * MAX_DIM) / height);
-              height = MAX_DIM;
-            }
+        const base64Data = e.target?.result as string;
+        // Split out the header data:image/png;base64, to get raw base64 data for Gemini SDK
+        const commaIndex = base64Data.indexOf(",");
+        if (commaIndex !== -1) {
+          setImageData(base64Data.substring(commaIndex + 1));
+          setImageMimeType(type);
+          setFileName(file.name);
+          setFileType("image");
+          
+          // Pre-fill a title if empty
+          if (!inputTitle) {
+            setInputTitle(`Image: ${file.name.replace(/\.[^/.]+$/, "")}`);
           }
-
-          const canvas = document.createElement("canvas");
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          if (ctx) {
-            // Modern browsers automatically handle EXIF orientation when drawing to canvas
-            ctx.drawImage(img, 0, 0, width, height);
-            
-            // Use image/jpeg for efficient compression, keeping text sharp with 0.85 quality
-            const mimeType = "image/jpeg";
-            const dataUrl = canvas.toDataURL(mimeType, 0.85);
-            
-            const commaIndex = dataUrl.indexOf(",");
-            if (commaIndex !== -1) {
-              setImageData(dataUrl.substring(commaIndex + 1));
-              setImageMimeType(mimeType);
-              setFileName(file.name);
-              setFileType("image");
-              
-              if (!inputTitle) {
-                setInputTitle(`Image: ${file.name.replace(/\.[^/.]+$/, "")}`);
-              }
-            } else {
-              setError("Failed to optimize upload image.");
-            }
-          } else {
-            // Fallback if canvas context is unavailable
-            const commaIndex = rawDataUrl.indexOf(",");
-            if (commaIndex !== -1) {
-              setImageData(rawDataUrl.substring(commaIndex + 1));
-              setImageMimeType(type);
-              setFileName(file.name);
-              setFileType("image");
-              if (!inputTitle) {
-                setInputTitle(`Image: ${file.name.replace(/\.[^/.]+$/, "")}`);
-              }
-            }
-          }
-        };
-        img.onerror = () => {
-          setError("Failed to load image for optimization.");
-        };
-        img.src = rawDataUrl;
+        }
       };
       reader.onerror = () => {
         setError("Failed to read image file.");
@@ -471,12 +266,10 @@ export default function App() {
     setKilvishStatus("loading");
     setError(null);
     setOutput("");
-    setDetectedLanguage("");
 
     try {
       const payload: any = {
         mode: mode,
-        persona: activePersona,
       };
 
       if (isSearchMode) {
@@ -496,17 +289,11 @@ export default function App() {
         }
       }
 
-      const headers: any = {
-        "Content-Type": "application/json",
-      };
-      if (user) {
-        const idToken = await user.getIdToken();
-        headers["Authorization"] = `Bearer ${idToken}`;
-      }
-
       const response = await fetch("/api/simplify", {
         method: "POST",
-        headers,
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(payload),
       });
 
@@ -516,13 +303,7 @@ export default function App() {
         throw new Error(data.error || "Failed to communicate with intelligence core.");
       }
 
-      // Refresh user profile states (remaining credits)
-      if (user) {
-        fetchUserProfile(user);
-      }
-
       setOutput(data.result);
-      setDetectedLanguage(data.detectedLanguage || "en");
       setKilvishStatus("idle");
 
       // Save to logs
@@ -544,19 +325,7 @@ export default function App() {
         imageMimeType: (!isSearchMode && imageMimeType) ? imageMimeType : undefined
       };
 
-      const updatedHistory = [logItem, ...history].slice(0, 50);
-      setHistory(updatedHistory);
-      localStorage.setItem("readability_ai_history_v2", JSON.stringify(updatedHistory));
-
-      if (user) {
-        try {
-          await saveUserHistoryItem(user.uid, logItem);
-        } catch (dbErr: any) {
-          console.error("Firestore save error:", dbErr);
-          setError("Cloud sync delayed: " + (dbErr.message || "Unknown error"));
-        }
-      }
-
+      saveHistory([logItem, ...history].slice(0, 50)); // Limit to 50 logs for local storage
       if (!isSearchMode) {
         setInputTitle(finalTitle); // Ensure input title field reflects what was saved
       }
@@ -570,173 +339,34 @@ export default function App() {
     }
   };
 
-  if (isAuthLoading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-slate-800">
-        <div className="flex flex-col items-center gap-4 animate-pulse">
-          <div className="w-12 h-12 rounded-xl bg-slate-950 flex items-center justify-center text-white font-bold text-2xl font-display shadow-md">
-            K
-          </div>
-          <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-widest text-slate-500">
-            <span className="w-2 h-2 rounded-full bg-indigo-600 animate-ping" />
-            <span>Establishing secure clarity channel...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <LandingPage onSignIn={handleSignIn} isAuthLoading={isAuthLoading} />;
-  }
-
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col lg:flex-row selection:bg-slate-200 selection:text-slate-900">
-      {/* Sidebar navigation */}
-      <Sidebar 
-        user={user}
-        onSignOut={handleSignOut}
-        activeView={activeView}
-        setActiveView={setActiveView}
-        userProfile={userProfile}
-        devMode={devMode}
-        setDevMode={setDevMode}
-      />
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col selection:bg-slate-200 selection:text-slate-900">
+      {/* Branding Header bar */}
+      <Header />
 
-      {/* Main Content Pane */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
-        {/* Global Unified Ecosystem Steps Navigation */}
-        <div className="bg-slate-900 text-white p-3.5 border-b border-slate-800 flex items-center justify-center sticky top-0 z-10 shadow-md">
-          {/* 5-Step Connected Pipeline Tracker */}
-          <div className="flex flex-wrap items-center justify-center gap-2 md:gap-3 bg-slate-950 p-1.5 rounded-2xl border border-slate-800 overflow-x-auto max-w-full">
-            {[
-              { step: 1, label: "Learn", desc: "Learn Anything", view: "academy", tab: "dashboard", color: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
-              { step: 2, label: "Build", desc: "Business Planner", view: "business", tab: "dashboard", color: "text-violet-400 bg-violet-500/10 border-violet-500/20" },
-              { step: 3, label: "Launch", desc: "Grow My Business", view: "growth", tab: "launch", color: "text-sky-400 bg-sky-500/10 border-sky-500/20" },
-              { step: 4, label: "Earn", desc: "Create & Earn", view: "create_earn", tab: "creator", color: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20" },
-              { step: 5, label: "Scale", desc: "Our Clients & Grow", view: "growth", tab: "crm", color: "text-pink-400 bg-pink-500/10 border-pink-500/20" },
-            ].map((s) => {
-              // Determine active status
-              const isActive = (s.view === "create_earn" && activeView === "create_earn") ||
-                (s.view === "growth" && s.tab === "creator" && activeView === "create_earn") ||
-                (s.view === "growth" && s.tab !== "creator" && activeView === "growth" && growthHubInitialTab === s.tab) ||
-                (s.view !== "growth" && s.view !== "create_earn" && activeView === s.view);
-              return (
-                <button
-                  key={s.step}
-                  onClick={() => {
-                    if (s.view === "create_earn") {
-                      setActiveView("create_earn");
-                    } else {
-                      setActiveView(s.view as any);
-                      if (s.view === "growth") {
-                        setGrowthHubInitialTab(s.tab as any);
-                      }
-                    }
-                  }}
-                  className={`px-3 py-1.5 rounded-xl border transition-all duration-200 cursor-pointer flex items-center gap-2 text-left shrink-0 ${
-                    isActive
-                      ? "bg-slate-800 border-slate-750 shadow-sm scale-105"
-                      : "border-transparent opacity-65 hover:opacity-100 hover:bg-slate-900"
-                  }`}
-                >
-                  <div className={`w-5 h-5 rounded-lg flex items-center justify-center text-[10px] font-black border ${s.color}`}>
-                    {s.step}
-                  </div>
-                  <div>
-                    <div className="text-[10px] font-black tracking-tight leading-none text-white">{s.label}</div>
-                    <div className="text-[8px] text-slate-400 font-mono tracking-wider font-semibold mt-0.5">{s.desc}</div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Main Workspace Layout or Billing or Admin */}
-        {activeView === "pricing" && user ? (
-          <PricingWalletView 
-            user={user}
-            userProfile={userProfile}
-            onRefreshProfile={() => fetchUserProfile(user)}
-          />
-        ) : (activeView === "growth" || activeView === "create_earn") && user ? (
-          <GrowthHubView 
-            user={user}
-            userProfile={userProfile}
-            onRefreshProfile={() => fetchUserProfile(user)}
-            initialTab={activeView === "create_earn" ? "creator" : growthHubInitialTab}
-            devMode={devMode}
-          />
-        ) : activeView === "business" && user ? (
-          <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col items-center">
-            <BusinessStudioView
-              user={user}
-              userProfile={userProfile}
-              onRefreshProfile={() => fetchUserProfile(user)}
-              setActiveView={setActiveView}
-              pipelineBusinessData={pipelineBusinessData}
-              clearPipelineBusinessData={() => setPipelineBusinessData(null)}
-            />
-          </div>
-        ) : activeView === "academy" && user ? (
-          <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col items-center">
-            <AcademyView
-              user={user}
-              userProfile={userProfile}
-              onRefreshProfile={() => fetchUserProfile(user)}
-              setActiveView={setActiveView}
-              onStartBusiness={(data) => {
-                setPipelineBusinessData(data);
-                setActiveView("business");
-              }}
-            />
-          </div>
-        ) : activeView === "search" ? (
-          <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col items-center">
-            <UniversalSearchView
-              user={user}
-              userProfile={userProfile}
-              onRefreshProfile={() => fetchUserProfile(user)}
-              setActiveView={setActiveView}
-            />
-          </div>
-        ) : activeView === "projects" && user ? (
-          <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col items-center">
-            <ProjectsHubView
-              user={user}
-              onRefreshProfile={() => fetchUserProfile(user)}
-              setActiveView={setActiveView}
-            />
-          </div>
-        ) : activeView === "admin" && user && userProfile?.role === "admin" ? (
-          <AdminConsoleView user={user} />
-        ) : (
-          <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-5 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+      {/* Main Workspace Layout */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
         {/* Left Column (Controls & Forms): Width 5 columns on desktop */}
-        <div className="lg:col-span-5 flex flex-col gap-4 h-full">
+        <div className="lg:col-span-5 flex flex-col gap-6 h-full">
           
           {/* Mr. Kilvish Persona Widget */}
           <MrKilvishAvatar status={kilvishStatus} />
-
-          {/* Persona Manager */}
-          <PersonaManager activePersona={activePersona} onPersonaChange={setActivePersona} devMode={devMode} />
 
           {/* Core Input Panel */}
           <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5 flex flex-col gap-5">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h2 className="font-display font-bold text-sm text-slate-800 tracking-wider uppercase flex items-center gap-2">
                 <span className="w-1.5 h-3 bg-slate-900 rounded-full" />
-                {devMode ? "Workspace Input" : "Your Input"}
+                Workspace Input
               </h2>
               <button
                 type="button"
                 onClick={handleWipeForm}
-                className="text-[11px] font-mono font-semibold text-slate-500 hover:text-rose-600 transition-all duration-300 flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 rounded border border-slate-200 cursor-pointer"
+                className="text-[11px] font-mono font-semibold text-slate-500 hover:text-rose-600 transition-all duration-300 flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 rounded border border-slate-200"
               >
                 <Eraser className="w-3.5 h-3.5" />
-                {devMode ? "Clear Workspace" : "Start Fresh"}
+                Clear Workspace
               </button>
             </div>
 
@@ -745,7 +375,7 @@ export default function App() {
               <div className="flex items-start gap-2.5 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <div className="leading-relaxed">
-                  <span className="font-semibold font-mono">{devMode ? "WORKSPACE ERROR:" : "ERROR:"}</span> {error}
+                  <span className="font-semibold font-mono">WORKSPACE ERROR:</span> {error}
                 </div>
               </div>
             )}
@@ -765,7 +395,7 @@ export default function App() {
                 }`}
               >
                 <FileText className="w-4.5 h-4.5" />
-                {devMode ? "Simplify Document" : "Explain Document"}
+                Simplify Document
               </button>
               <button
                 type="button"
@@ -780,7 +410,7 @@ export default function App() {
                 }`}
               >
                 <Infinity className="w-4.5 h-4.5" />
-                {devMode ? "Infinity Search" : "Search & Learn"}
+                Infinity Search
               </button>
             </div>
 
@@ -948,12 +578,12 @@ export default function App() {
                 {isLoading ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>{devMode ? "SYNTHESIZING..." : "Working..."}</span>
+                    <span>SYNTHESIZING...</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    <span>{inputTab === "search" ? (devMode ? "Search & Explain" : "Search & Learn") : (devMode ? "Banish Jargon" : "Explain")}</span>
+                    <span>{inputTab === "search" ? "Search & Explain" : "Banish Jargon"}</span>
                     <ArrowRight className="w-4 h-4 text-white" />
                   </>
                 )}
@@ -971,21 +601,16 @@ export default function App() {
         </div>
 
         {/* Right Column (Output Display & Visualizer): Width 7 columns on desktop */}
-        <div className="lg:col-span-7 flex flex-col gap-4 h-full">
+        <div className="lg:col-span-7 flex flex-col gap-6 h-full">
           
           {/* Main output terminal */}
-          <LocalizedErrorBoundary>
-            <OutputDisplay 
-              text={output} 
-              isLoading={isLoading} 
-              user={user}
-              detectedLanguage={detectedLanguage}
-              devMode={devMode}
-              onSpeechStateChange={(isSpeaking) => {
-                setKilvishStatus(isSpeaking ? "speaking" : "idle");
-              }}
-            />
-          </LocalizedErrorBoundary>
+          <OutputDisplay 
+            text={output} 
+            isLoading={isLoading} 
+            onSpeechStateChange={(isSpeaking) => {
+              setKilvishStatus(isSpeaking ? "speaking" : "idle");
+            }}
+          />
 
           {/* Knowledge Insight Card: Simple UI decoration showing the rules in motion */}
           <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5 flex flex-col gap-4">
@@ -1027,32 +652,12 @@ export default function App() {
           </div>
         </div>
       </main>
-      )}
 
-        {/* Decorative clean footer */}
-        <footer className="border-t border-slate-200 py-6 text-center text-xs font-mono text-slate-400 bg-white mt-auto font-semibold flex flex-col items-center gap-2">
-          <div className="flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-1">
-            <button onClick={() => setComplianceTab("about")} className="hover:text-indigo-600 transition cursor-pointer">About Us</button>
-            <span>&bull;</span>
-            <button onClick={() => setComplianceTab("privacy")} className="hover:text-indigo-600 transition cursor-pointer">Privacy Policy</button>
-            <span>&bull;</span>
-            <button onClick={() => setComplianceTab("terms")} className="hover:text-indigo-600 transition cursor-pointer">Terms & Conditions</button>
-            <span>&bull;</span>
-            <button onClick={() => setComplianceTab("refund")} className="hover:text-indigo-600 transition cursor-pointer">Refund Policy</button>
-            <span>&bull;</span>
-            <button onClick={() => setComplianceTab("contact")} className="hover:text-indigo-600 transition cursor-pointer">Contact Us</button>
-          </div>
-          <p>&copy; {new Date().getFullYear()} READABILITY AI. ALL RIGHTS OF CLARITY PRESERVED.</p>
-          <p className="text-[10px] mt-1 text-slate-400 font-medium">POWERED BY GEMINI-3.5-FLASH &bull; CORE ENGINE: MR. KILVISH</p>
-        </footer>
-
-        {complianceTab && (
-          <ComplianceModal 
-            initialTab={complianceTab} 
-            onClose={() => setComplianceTab(null)} 
-          />
-        )}
-      </div>
+      {/* Decorative clean footer */}
+      <footer className="border-t border-slate-200 py-6 text-center text-xs font-mono text-slate-400 bg-white mt-auto font-semibold">
+        <p>&copy; {new Date().getFullYear()} READABILITY AI. ALL RIGHTS OF CLARITY PRESERVED.</p>
+        <p className="text-[10px] mt-1 text-slate-400">POWERED BY GEMINI-3.5-FLASH &bull; CORE ENGINE: MR. KILVISH</p>
+      </footer>
     </div>
   );
 }
