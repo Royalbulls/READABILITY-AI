@@ -1,6 +1,10 @@
 # Readability AI
 
-Readability AI simplifies and clarifies text (or text extracted from images) using the Gemini API. It exposes a small Express API and a frontend served by Vite for local development and deployment. The server uses a resilient Gemini client with retries and model fallback.
+[![CI](https://github.com/Royalbulls/READABILITY-AI/actions/workflows/ci.yml/badge.svg)](https://github.com/Royalbulls/READABILITY-AI/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/Royalbulls/READABILITY-AI.svg)](https://github.com/Royalbulls/READABILITY-AI/blob/main/LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org/)
+
+Readability AI simplifies and clarifies text (or text extracted from images) using the Gemini API. It exposes a small Express API and a frontend served by Vite for local development and deployment. The server uses a resilient Gemini client with retries and model fallback to handle transient API errors.
 
 ## Features
 - Simplify or explain input text and image-extracted text.
@@ -107,9 +111,10 @@ Notes:
 - Handle user-uploaded images/text carefully if operating with sensitive data—consider redaction or explicit consent.
 
 ## License
-No license file detected in repository. If you want to add a license, I can add a LICENSE file (MIT, Apache-2.0, etc.). Tell me which license you prefer.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
 
 ## Next steps I can take
-- Commit this README.md to the repository (default branch) — tell me the commit message you'd like (default: "chore: improve README").
-- Add a LICENSE file (specify which license).
-- Add badges (node version, build status) if you provide CI details.
+- Add CONTRIBUTING.md and a PR template.
+- Expand README with more examples, Postman collection, and sample requests.
+- Add screenshots or demo GIFs (provide image URLs or I can add placeholders).
+- Improve code comments or make minor refactors (server.ts).
