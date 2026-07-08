@@ -1,11 +1,43 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import dotenv from "dotenv";
 
 // Load environment variables
 dotenv.config();
+
+const COURSES_FILE = path.join(process.cwd(), "courses.json");
+
+// Safe helper to read courses
+async function readCourses(): Promise<Record<string, any>> {
+  try {
+    if (!fs.existsSync(COURSES_FILE)) {
+      return {};
+    }
+    const data = await fs.promises.readFile(COURSES_FILE, "utf-8");
+    return JSON.parse(data || "{}");
+  } catch (err) {
+    console.error("Error reading courses file, returning empty:", err);
+    return {};
+  }
+}
+
+// Safe helper to save a course
+async function saveCourse(id: string, courseData: any): Promise<void> {
+  try {
+    const courses = await readCourses();
+    courses[id] = {
+      ...courseData,
+      id,
+      timestamp: Date.now()
+    };
+    await fs.promises.writeFile(COURSES_FILE, JSON.stringify(courses, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Error saving course:", err);
+  }
+}
 
 let aiInstance: GoogleGenAI | null = null;
 
@@ -36,12 +68,18 @@ async function generateContentWithRetryAndFallback(
     config: any;
   }
 ): Promise<GenerateContentResponse> {
-  const modelsToTry = ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"];
+  const modelsToTry = [
+    "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-flash-latest"
+  ];
   let lastError: any = null;
 
   for (const model of modelsToTry) {
-    let attempts = 3;
-    let delay = 1000;
+    // If a model is overloaded (503/429), retry at most twice (attempt 1 and 2) before falling back.
+    let attempts = 2; 
+    let delay = 500;
 
     for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
@@ -55,29 +93,59 @@ async function generateContentWithRetryAndFallback(
       } catch (error: any) {
         lastError = error;
         const errorMessage = error.message || "";
-        const isTransient =
-          errorMessage.includes("503") ||
-          errorMessage.includes("UNAVAILABLE") ||
+        
+        const isQuotaExceeded =
           errorMessage.includes("ResourceExhausted") ||
           errorMessage.includes("429") ||
+          errorMessage.toLowerCase().includes("quota") ||
+          (error.status && error.status === "RESOURCE_EXHAUSTED") ||
+          (error.code && error.code === 429) ||
+          (error.status && error.status === 429);
+
+        const isTransient =
+          isQuotaExceeded ||
+          errorMessage.includes("503") ||
+          errorMessage.includes("UNAVAILABLE") ||
           errorMessage.includes("demand") ||
-          errorMessage.includes("temporary");
+          errorMessage.includes("temporary") ||
+          (error.status && error.status === 503) ||
+          (error.code && error.code === 503);
+
+        const isAuthError =
+          errorMessage.includes("API_KEY_INVALID") ||
+          errorMessage.includes("403") ||
+          errorMessage.toLowerCase().includes("invalid api key") ||
+          errorMessage.toLowerCase().includes("key not valid") ||
+          (error.status && error.status === 403) ||
+          (error.code && error.code === 403);
 
         console.warn(`[Readability AI] Error using model ${model} (attempt ${attempt}/${attempts}):`, errorMessage);
 
-        if (!isTransient) {
-          // If it's a fatal non-transient error (e.g., Auth, Invalid argument), fail immediately
+        if (isAuthError) {
+          // If it's an API Key / authentication issue, fail immediately since other models will also fail
           throw error;
+        }
+
+        if (isQuotaExceeded) {
+          console.warn(`[Readability AI] Quota exceeded (429/RESOURCE_EXHAUSTED) for model ${model}. Falling back immediately.`);
+          break; // Break the attempt loop to try the next model
+        }
+
+        if (!isTransient) {
+          // For other non-transient errors (like model not found or invalid config for this model), 
+          // skip retrying this model and fall back to the next model immediately.
+          console.warn(`[Readability AI] Non-transient error for model ${model}. Falling back to next model.`);
+          break;
         }
 
         if (attempt < attempts) {
           // Wait before retrying with exponential backoff
           await new Promise((resolve) => setTimeout(resolve, delay));
-          delay *= 1.5;
+          delay *= 2;
         }
       }
     }
-    console.log(`[Readability AI] Model ${model} exhausted or returned 503/429. Falling back to the next model...`);
+    console.log(`[Readability AI] Model ${model} failed or skipped. Trying next model if available...`);
   }
 
   throw lastError || new Error("Failed to generate content after trying multiple models and retries.");
@@ -103,7 +171,7 @@ async function startServer() {
   // API: Main simplification endpoint
   app.post("/api/simplify", async (req, res) => {
     try {
-      const { text, image, mode, topic } = req.body;
+      const { text, image, mode, topic, language } = req.body;
 
       if (!text && !image && !topic) {
         return res.status(400).json({ error: "Input text, image, or search topic is required." });
@@ -111,10 +179,45 @@ async function startServer() {
 
       const client = getGeminiClient();
 
-      const systemInstruction = `You are MR. KILVISH, the innovative, practical, and highly efficient intelligence engine for "Readability AI", and the elite dean of "Mr. Kilvish AI Academy". Your sole sacred mission is to banish the darkness of obscure technical jargon, legal terms, academic fluff, and messy notes, bringing ultimate, crystal-clear light (readability) to everyone.
+      let languageRule = "";
+      if (language === "hi") {
+        languageRule = `
+LANGUAGE RULE (CRITICAL):
+You MUST output the entire response in clean, grammatically correct Hindi (using Devanagari script).
+Ensure you translate complex technical, legal, or academic terms into standard, simple Hindi words, but you may keep the core English term in parentheses next to it for context (e.g., "कंप्यूटर (Computer)", "सॉफ्टवेयर (Software)", "आर्टिफिशियल इंटेलिजेंस (Artificial Intelligence)").
+The structural headers must be translated to elegant Hindi:
+- SECTION 1: "The Core Concept" -> "मुख्य विचार / मूल अवधारणा"
+- SECTION 2: "The Breakdown" -> "विस्तृत विश्लेषण"
+- "**Mr. Kilvish's Verdict:**" -> "**श्री किल्विष का फैसला:**"
+Keep your persona as Mr. Kilvish but fully speak in simplified Hindi. Use warm, respectful, and authoritative Hindi.
+`;
+      } else if (language === "hinglish") {
+        languageRule = `
+LANGUAGE RULE (CRITICAL):
+You MUST output the entire response in friendly, conversational Hinglish (Hindi written in the Latin/English alphabet). This is the natural blend of Hindi and English that people use in chat messaging, WhatsApp, or how voice assistants like Google Assistant and Alexa talk to Indian users.
+Example structures:
+- Instead of "This is a very complex topic", say "Yeh ek kaafi complex topic hai".
+- Instead of "You must understand the fundamentals", say "Aapko iske fundamentals samajhna bohot zaroori hai".
+Ensure you use common English terminology (like "computer", "idea", "technology", "logic", "career", "salary") but structure the sentences with Hindi grammar in English script.
+The structural headers must be translated to clean Hinglish:
+- SECTION 1: "The Core Concept" -> "Main Concept Kya Hai?"
+- SECTION 2: "The Breakdown" -> "Aasan Bhasha Mein Breakdown"
+- "**Mr. Kilvish's Verdict:**" -> "**Mr. Kilvish Ka Faisla:**"
+Keep your persona as Mr. Kilvish but fully speak in highly friendly, engaging Hinglish!
+`;
+      } else {
+        languageRule = `
+LANGUAGE RULE:
+You MUST output the entire response in clear, simplified English.
+`;
+      }
+
+      const systemInstruction = `You are MR. KILVISH, the innovative, practical, and highly efficient intelligence engine for "Readability", and the elite dean of "Mr. Kilvish AI Academy". Your sole sacred mission is to banish the darkness of obscure technical jargon, legal terms, academic fluff, and messy notes, bringing ultimate, crystal-clear light (readability) to everyone.
 
 Your catchphrase is: "Clarity shall prevail!" or "Clarity is power!"
 Adopt a persona that is highly professional, encouraging, practical, and crystal clear. You hate unnecessary words and complex sentences.
+
+${languageRule}
 
 CRITICAL OPERATING RULES:
 1. NO JARGON: Replace complex terminology with common, everyday language. If you must use a technical term, define it briefly in parentheses.
@@ -124,9 +227,9 @@ CRITICAL OPERATING RULES:
     - Use bold text (**like this**) for key takeaways.
 3. TONE: Professional, encouraging, and crystal clear.
 4. FORMATTING: You must strictly format the response in exactly two sections (EXCEPT for [Mr. Kilvish Academy Mode]):
-    - SECTION 1: "The Core Concept" (An elegant 2-3 sentence summary of the main concept/point).
-    - SECTION 2: "The Breakdown" (Detailed, structured, and easy-to-read content that breaks down all details, processes, or key elements).
-    - At the very end of SECTION 2, append a brief, sharp, and practical bold block called "**Mr. Kilvish's Verdict:**" highlighting the absolute bottom-line action or efficiency takeaway (max 2 sentences).
+    - SECTION 1: "The Core Concept" (or equivalent language translation) (An elegant 2-3 sentence summary of the main concept/point).
+    - SECTION 2: "The Breakdown" (or equivalent language translation) (Detailed, structured, and easy-to-read content that breaks down all details, processes, or key elements).
+    - At the very end of SECTION 2, append a brief, sharp, and practical bold block called "**Mr. Kilvish's Verdict:**" (or equivalent language translation) highlighting the absolute bottom-line action or efficiency takeaway (max 2 sentences).
 5. LIMITS: If the input text or document is extremely long or complex, automatically organize and summarize it into highly digestible, actionable chunks.
 
 MODE-SPECIFIC RULES:
@@ -135,41 +238,41 @@ If the user specifies a particular mode, modify your style accordingly:
 - [Pro Mode] (Concise & Professional): Make it extremely streamlined, high-density, action-oriented, and focused on business value or execution. Use sharp bullet points and clean structure.
 - [Student Mode] (Educational & Concept-focused): Highlight key concepts and definitions systematically. Explain how things work step-by-step. Focus heavily on core educational vocabulary, defining terms clearly and creating a structured conceptual framework.
 - [Mr. Kilvish Academy Mode] (Premium Syllabus / E-Book Course):
-  Transform the topic into an ultra-comprehensive, deep premium course module worth ₹9999. Do not keep it short; go deep and explain everything in extreme detail with simple English (Class 8-10 level). You MUST organize the output strictly according to the following 30-part structure. If the topic is a general non-career subject (e.g. Quantum Computing, AI, Personal Finance), adapt the career-focused headings creatively to match the topic (e.g., Physical/Medical standards become "System/Structural Prerequisites" or "Mental Readiness Metrics", Documents become "Essential Reading/Reference List"):
+  Transform the topic into an ultra-comprehensive, deep premium course module. Do not keep it short; go deep and explain everything in extreme detail (translated to the target language as requested). You MUST organize the output strictly according to the following 30-part structure. If the topic is a general non-career subject, adapt the career-focused headings creatively to match the topic:
   
   MANDATORY STRUCTURE:
-  1. Welcome Message & Course Overview (Welcoming learners to Mr. Kilvish AI Academy)
+  1. Welcome Message & Course Overview
   2. Introduction to the Topic
-  3. Why This Topic/Career Matters (Impact & Future scope)
-  4. Eligibility Criteria (Academic, Age, or prerequisite knowledge)
+  3. Why This Topic/Career Matters
+  4. Eligibility Criteria
   5. Complete Step-by-Step Learning Process / Roadmap
-  6. Every Stage Explained in Detail (Deep-dive into each milestone)
+  6. Every Stage Explained in Detail
   7. Important Rules & Key Concepts
-  8. Required Documents (Certifications, accounts, tools, or references needed)
-  9. Physical Standards (or environmental/mental readiness standards)
-  10. Medical Standards (or health, eye safety, ergonomics, or quality checklists)
-  11. Written Exam Strategy (or theoretical study & exam-taking secrets)
-  12. Subject-wise Preparation (Detailed subject or core-pillar breakdown)
-  13. Physical Preparation Plan (or hands-on lab projects & coding drills)
-  14. Daily Routine (Optimized daily hours allocated to master this topic)
-  15. Diet Plan (or mental focus diet & hydration rules for high intelligence)
-  16. Training After Selection (or what to expect once you start working / practicing)
-  17. Salary (or earning potential, consulting fees, or job market metrics)
-  18. Benefits (or lifestyle perks & rewards)
+  8. Required Documents (or references needed)
+  9. Physical Standards (or prerequisites)
+  10. Medical Standards (or health checklist)
+  11. Written Exam Strategy (or study secrets)
+  12. Subject-wise Preparation
+  13. Physical Preparation Plan (or coding/lab drills)
+  14. Daily Routine
+  15. Diet Plan
+  16. Training After Selection
+  17. Salary (or earning potential)
+  18. Benefits (or lifestyle perks)
   19. Career Growth & Industry Outlook
-  20. Promotions (or moving from Junior to Expert levels)
-  21. Common Mistakes made by beginners & how to avoid them
-  22. Do's & Don'ts (Styled as a clean comparison table or list)
-  23. Frequently Asked Questions (Minimum 10-15 highly detailed FAQs)
-  24. Myth vs Reality (Clearing popular misconceptions with proof)
-  25. Latest Updates (Clearly advise candidates to verify current official notifications as policies and requirements may change over time; do not invent outdated data)
-  26. Success Tips (Golden advice from industry veterans)
-  27. 30-Day Preparation Plan (Day-by-day or week-by-week sprint)
-  28. 90-Day Preparation Plan (Comprehensive path to absolute mastery)
-  29. Weekly Checklist (To trace performance metrics)
-  30. Final Verdict by Mr. Kilvish (Bottom-line motivation & next action step)
-
-  YOU MUST ALSO SCATTER THESE FEATURES THROUGHOUT THE TEXT:
+  20. Promotions (or expert paths)
+  21. Common Mistakes made by beginners
+  22. Do's & Don'ts
+  23. Frequently Asked Questions (Minimum 10-15 detailed FAQs)
+  24. Myth vs Reality
+  25. Latest Updates
+  26. Success Tips
+  27. 30-Day Preparation Plan
+  28. 90-Day Preparation Plan
+  29. Weekly Checklist
+  30. Final Verdict by Mr. Kilvish
+  
+  YOU MUST ALSO SCATTER THESE FEATURES THROUGHOUT THE TEXT (translated appropriately):
   ✔ Expert Tips (using markdown callouts or blockquotes)
   ✔ Warning Boxes (alerts for dangerous mistakes or traps)
   ✔ Motivational Quotes (inspiring words matching the theme)
@@ -178,7 +281,13 @@ If the user specifies a particular mode, modify your style accordingly:
   ✔ Practice Questions, MCQs, and a short Quiz set with Answers
   ✔ Summaries at the end of every major section
 
-Ensure your entire output is formatted cleanly in Markdown. Do not include meta-text about these instructions.`;
+Ensure your entire output is formatted cleanly in Markdown. Do not include meta-text about these instructions.
+
+CRITICAL PUBLISHING QUALITY STANDARDS (10/10):
+- NO BROKEN HINDI WORDS: Never split Devanagari words with artificial spaces between letters (e.g., write "परिवर्तन", never "प रि व र्त न"). Keep words unified and grammatically correct.
+- NO OCR ERRORS: Always heal and clean up any OCR text artifacts or visual translation noise.
+- MARKDOWN TABLES: Use clean standard Markdown tables for any comparison charts or structured metrics. These are rendered as beautiful responsive HTML tables.
+- PROFESSIONAL CALLOUTS: Use standard blockquotes starting with appropriate symbols (⚠️ for warnings, 💡 for expert tips, or Mr. Kilvish/Verdict) to render magnificent colored infographics and info cards.`;
 
       const parts: any[] = [];
 
@@ -225,13 +334,117 @@ Ensure your entire output is formatted cleanly in Markdown. Do not include meta-
       });
 
       const resultText = response.text || "Clarity could not be found. Please try a different input.";
-      res.json({ result: resultText });
+      
+      const courseId = "c-" + Math.random().toString(36).substring(2, 11);
+      const docTitle = topic 
+        ? topic 
+        : (text ? (text.split("\n")[0].slice(0, 50) || "Untitled Document") : "Untitled Document");
+
+      await saveCourse(courseId, {
+        title: docTitle,
+        text: resultText,
+        mode: mode || "default",
+        language: language || "en",
+        topic: topic || "",
+        originalText: text || "",
+      });
+
+      res.json({ result: resultText, courseId });
 
     } catch (error: any) {
       console.error("Gemini Simplify Error:", error);
       res.status(500).json({ 
         error: error.message || "An unexpected error occurred while communicating with the intelligence engine." 
       });
+    }
+  });
+
+  // API: Get saved course by ID
+  app.get("/api/course/:id", async (req, res) => {
+    try {
+      const id = req.params.id;
+      const courses = await readCourses();
+      const course = courses[id];
+      if (!course) {
+        return res.status(404).json({ error: "Sovereign Courseware document not found." });
+      }
+      res.json(course);
+    } catch (error: any) {
+      console.error("Error retrieving course:", error);
+      res.status(500).json({ error: "Failed to retrieve the requested Courseware." });
+    }
+  });
+
+  // API: Get all saved courses (for Academy Library)
+  app.get("/api/courses", async (req, res) => {
+    try {
+      const courses = await readCourses();
+      // Return as an array sorted by timestamp descending
+      const list = Object.values(courses).sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0));
+      res.json(list);
+    } catch (error: any) {
+      console.error("Error retrieving courses:", error);
+      res.status(500).json({ error: "Failed to retrieve Courseware Library." });
+    }
+  });
+
+  // API: AI Tutor chatbot endpoint
+  app.post("/api/tutor", async (req, res) => {
+    try {
+      const { courseId, courseTitle, courseText, message, chatHistory } = req.body;
+
+      if (!message || !courseText) {
+        return res.status(400).json({ error: "Course content and student message are required." });
+      }
+
+      const client = getGeminiClient();
+
+      const systemInstruction = `You are Mr. Kilvish AI Tutor, the official personal academic assistant of "Mr. Kilvish Academy".
+Your student is studying a textbook courseware block on the topic: "${courseTitle || "Sovereign Studies"}".
+
+Here is the exact textbook content they are reading:
+"""
+${courseText}
+"""
+
+Your mission:
+1. Answer the student's questions about this textbook content in a clear, extremely friendly, practical, and engaging manner.
+2. If the student asks questions outside of this topic, gently steer them back to the course topic but still provide a short helpful answer if related to their studies.
+3. Keep your answers concise, structured, and easy to understand. Banish heavy academic jargon or define it instantly.
+4. Maintain the signature Mr. Kilvish persona: authoritative, encouraging, and clear ("Clarity is power!").
+5. Respond in the same language the student asks their question in (e.g., if they ask in Hindi, reply in Hindi; if in Hinglish, reply in Hinglish; if in English, reply in English).`;
+
+      // Build chat history part structures
+      const formattedContents: any[] = [];
+      if (chatHistory && Array.isArray(chatHistory)) {
+        chatHistory.forEach((msg: any) => {
+          formattedContents.push({
+            role: msg.role === "user" ? "user" : "model",
+            parts: [{ text: msg.content }]
+          });
+        });
+      }
+      
+      // Add the latest user message
+      formattedContents.push({
+        role: "user",
+        parts: [{ text: message }]
+      });
+
+      const response = await generateContentWithRetryAndFallback(client, {
+        contents: formattedContents,
+        config: {
+          systemInstruction,
+          temperature: 0.5,
+        }
+      });
+
+      const tutorResponseText = response.text || "I was unable to formulate a response. Let us try that again.";
+      res.json({ reply: tutorResponseText });
+
+    } catch (error: any) {
+      console.error("AI Tutor Error:", error);
+      res.status(500).json({ error: error.message || "An unexpected error occurred in the tutor module." });
     }
   });
 

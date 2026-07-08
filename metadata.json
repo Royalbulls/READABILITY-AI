@@ -1,5 +1,5 @@
 {
-  "name": "Readability AI",
+  "name": "Readability",
   "description": "An AI-powered readability tool that simplifies complex technical jargon, academic text, legal documents, and messy notes into easy-to-read content.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

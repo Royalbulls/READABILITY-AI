@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Sparkles, Activity, ShieldCheck, ShieldAlert } from "lucide-react";
+import { Sparkles, Activity, ShieldCheck, ShieldAlert, Home, Terminal, Info } from "lucide-react";
 
-export default function Header() {
+interface HeaderProps {
+  activeTab: "home" | "workspace" | "about";
+  setActiveTab: (tab: "home" | "workspace" | "about") => void;
+}
+
+export default function Header({ activeTab, setActiveTab }: HeaderProps) {
   const [apiKeyOk, setApiKeyOk] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -12,16 +17,22 @@ export default function Header() {
   }, []);
 
   return (
-    <header className="relative border-b border-slate-200 bg-white px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <header className="relative border-b border-slate-200 bg-white px-6 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4 z-40">
       {/* Brand & Logo */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center text-white font-bold text-xl font-display">
+        <div 
+          onClick={() => setActiveTab("home")}
+          className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center text-white font-bold text-xl font-display cursor-pointer transition-transform hover:scale-105"
+        >
           K
         </div>
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="font-display font-bold text-xl tracking-tight text-slate-950 uppercase">
-              READABILITY <span className="text-slate-500 font-medium">AI</span>
+            <h1 
+              onClick={() => setActiveTab("home")}
+              className="font-display font-bold text-xl tracking-tight text-slate-950 uppercase cursor-pointer hover:text-slate-800 transition-colors"
+            >
+              READABILITY
             </h1>
             <span className="text-[10px] bg-slate-100 text-slate-600 border border-slate-200 font-mono px-1.5 py-0.5 rounded uppercase tracking-wider font-semibold">
               v2.5
@@ -33,12 +44,49 @@ export default function Header() {
         </div>
       </div>
 
+      {/* Navigation Tabs */}
+      <nav className="flex items-center gap-1.5 bg-slate-100 p-1.5 rounded-xl self-start md:self-auto">
+        <button
+          onClick={() => setActiveTab("home")}
+          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase transition-all duration-200 cursor-pointer ${
+            activeTab === "home"
+              ? "bg-white text-slate-950 shadow-sm"
+              : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <Home className="w-3.5 h-3.5" />
+          <span>Home</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("workspace")}
+          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase transition-all duration-200 cursor-pointer ${
+            activeTab === "workspace"
+              ? "bg-white text-slate-950 shadow-sm"
+              : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <Terminal className="w-3.5 h-3.5" />
+          <span>Workspace</span>
+        </button>
+        <button
+          onClick={() => setActiveTab("about")}
+          className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-mono font-bold uppercase transition-all duration-200 cursor-pointer ${
+            activeTab === "about"
+              ? "bg-white text-slate-950 shadow-sm"
+              : "text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <Info className="w-3.5 h-3.5" />
+          <span>About</span>
+        </button>
+      </nav>
+
       {/* Connection & Engine Status */}
       <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
         {/* Core Status */}
         <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200 text-slate-600">
           <Activity className="w-3.5 h-3.5 text-blue-500 animate-[pulse_1.5s_infinite]" />
-          <span>Engine: <span className="text-slate-900 font-semibold">KILVISH ACTIVE</span></span>
+          <span>Engine: <span className="text-slate-900 font-semibold text-[11px]">MR. KILVISH</span></span>
         </div>
 
         {/* API Key Status */}

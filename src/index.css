@@ -1,9 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Poppins:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Space Grotesk", sans-serif;
+  --font-sans: "Inter", "Poppins", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Poppins", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
@@ -14,6 +14,28 @@
   }
   .glow-green-sm {
     box-shadow: 0 0 10px rgba(16, 185, 129, 0.1);
+  }
+}
+
+/* Print Optimization with Page Breaks */
+@media print {
+  .print-page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+    margin-top: 2rem !important;
+    border-top: 2px solid #e2e8f0 !important;
+    padding-top: 2rem !important;
+  }
+  
+  /* Hide non-print components in layout if print triggers */
+  .print-hide {
+    display: none !important;
+  }
+  
+  /* Ensure correct colors and backgrounds when printing */
+  body {
+    background-color: white !important;
+    color: black !important;
   }
 }
 

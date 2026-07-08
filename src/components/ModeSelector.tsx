@@ -1,6 +1,19 @@
 import React from "react";
 import { SimplificationMode } from "../types";
-import { Sparkles, Baby, Briefcase, GraduationCap, BookOpen } from "lucide-react";
+import { 
+  Sparkles, 
+  Baby, 
+  Briefcase, 
+  GraduationCap, 
+  BookOpen, 
+  Book, 
+  Feather, 
+  Tv, 
+  Film, 
+  Video, 
+  Gamepad2, 
+  Newspaper 
+} from "lucide-react";
 
 interface ModeSelectorProps {
   activeMode: SimplificationMode;
@@ -67,6 +80,86 @@ const MODES: ModeConfig[] = [
     icon: BookOpen,
     activeColor: "bg-gradient-to-r from-violet-600 to-indigo-700 text-white border-violet-800 shadow-lg ring-2 ring-violet-400/20",
     borderColor: "hover:border-violet-300 hover:bg-violet-50/30 border-slate-200 text-slate-700 bg-white",
+    textColor: "text-white"
+  },
+  {
+    id: "ebook",
+    title: "Premium E-Book",
+    badge: "Book Draft",
+    description: "Structures information into neat, chapters-based books with page-breaks and educational sections.",
+    icon: Book,
+    activeColor: "bg-emerald-600 text-white border-emerald-700 shadow-md",
+    borderColor: "hover:border-slate-300 hover:bg-slate-50 border-slate-200 text-slate-700 bg-white",
+    textColor: "text-white"
+  },
+  {
+    id: "storybook",
+    title: "Story Book",
+    badge: "Narrative",
+    description: "Retells facts or complex concepts as an engaging story with scene dialogues and visual cues.",
+    icon: Feather,
+    activeColor: "bg-amber-600 text-white border-amber-700 shadow-md",
+    borderColor: "hover:border-slate-300 hover:bg-slate-50 border-slate-200 text-slate-700 bg-white",
+    textColor: "text-white"
+  },
+  {
+    id: "webseries",
+    title: "Web Series Episode",
+    badge: "Screenplay",
+    description: "Converts complex subjects into sequential episodic script blueprints with actors and audio SFX.",
+    icon: Tv,
+    activeColor: "bg-red-600 text-white border-red-700 shadow-md",
+    borderColor: "hover:border-slate-300 hover:bg-slate-50 border-slate-200 text-slate-700 bg-white",
+    textColor: "text-white"
+  },
+  {
+    id: "film",
+    title: "Film Script",
+    badge: "Cinema Script",
+    description: "Formats topics into a classic professional script layout with scenes, action, and dialogue lines.",
+    icon: Film,
+    activeColor: "bg-rose-600 text-white border-rose-700 shadow-md",
+    borderColor: "hover:border-slate-300 hover:bg-slate-50 border-slate-200 text-slate-700 bg-white",
+    textColor: "text-white"
+  },
+  {
+    id: "animation",
+    title: "Animation Storyboard",
+    badge: "Storyboard",
+    description: "Builds a frame-by-frame animatic plan with visual notes, camera directions, and design tips.",
+    icon: Video,
+    activeColor: "bg-pink-600 text-white border-pink-700 shadow-md",
+    borderColor: "hover:border-slate-300 hover:bg-slate-50 border-slate-200 text-slate-700 bg-white",
+    textColor: "text-white"
+  },
+  {
+    id: "game",
+    title: "Game & App Dev Project",
+    badge: "GDD & Code",
+    description: "Drafts interactive gameplay loops, code logic architecture, database models, and build blueprints.",
+    icon: Gamepad2,
+    activeColor: "bg-fuchsia-600 text-white border-fuchsia-700 shadow-md",
+    borderColor: "hover:border-slate-300 hover:bg-slate-50 border-slate-200 text-slate-700 bg-white",
+    textColor: "text-white"
+  },
+  {
+    id: "news",
+    title: "News & Journalism",
+    badge: "Editorial",
+    description: "Outputs content styled as a premium news article or hot investigative journalism dispatch.",
+    icon: Newspaper,
+    activeColor: "bg-sky-600 text-white border-sky-700 shadow-md",
+    borderColor: "hover:border-slate-300 hover:bg-slate-50 border-slate-200 text-slate-700 bg-white",
+    textColor: "text-white"
+  },
+  {
+    id: "business",
+    title: "Business Proposal",
+    badge: "Pitch Deck",
+    description: "Transforms materials into strategic case briefs, value propositions, ROI tables, and risk plans.",
+    icon: Briefcase,
+    activeColor: "bg-zinc-800 text-white border-zinc-950 shadow-md",
+    borderColor: "hover:border-slate-300 hover:bg-slate-50 border-slate-200 text-slate-700 bg-white",
     textColor: "text-white"
   }
 ];

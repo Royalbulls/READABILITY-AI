@@ -4,7 +4,11 @@ import MrKilvishAvatar from "./components/MrKilvishAvatar";
 import ModeSelector from "./components/ModeSelector";
 import ExamplesHistoryPanel from "./components/ExamplesHistoryPanel";
 import OutputDisplay from "./components/OutputDisplay";
-import { InputHistoryItem, SimplificationMode } from "./types";
+import HomeSection from "./components/HomeSection";
+import AboutSection from "./components/AboutSection";
+import CoursePage from "./components/CoursePage";
+import { InputHistoryItem, SimplificationMode, OutputLanguage } from "./types";
+import { EXAMPLES_DATA } from "./examplesData";
 import { 
   Upload, 
   X, 
@@ -13,6 +17,7 @@ import {
   AlertCircle, 
   FileText, 
   ArrowRight,
+  ArrowLeft,
   RefreshCw,
   HelpCircle,
   TrendingUp,
@@ -30,12 +35,16 @@ const TOPIC_SUGGESTIONS = [
 ];
 
 export default function App() {
+  // Navigation active tab: 'home' | 'workspace' | 'about'
+  const [activeTab, setActiveTab] = useState<"home" | "workspace" | "about">("home");
+  
   // Input form states
   const [inputTab, setInputTab] = useState<"simplify" | "search">("simplify");
   const [searchTopic, setSearchTopic] = useState("");
-  const [inputText, setInputText] = useState("");
-  const [inputTitle, setInputTitle] = useState("");
-  const [mode, setMode] = useState<SimplificationMode>("default");
+  const [inputText, setInputText] = useState(EXAMPLES_DATA[0].text);
+  const [inputTitle, setInputTitle] = useState(EXAMPLES_DATA[0].title);
+  const [mode, setMode] = useState<SimplificationMode>("academy");
+  const [language, setLanguage] = useState<OutputLanguage>("hi");
   
   // File upload states
   const [fileName, setFileName] = useState("");
@@ -44,7 +53,7 @@ export default function App() {
   const [imageMimeType, setImageMimeType] = useState<string | null>(null);
   
   // App system states
-  const [output, setOutput] = useState("");
+  const [output, setOutput] = useState(EXAMPLES_DATA[0].text);
   const [isLoading, setIsLoading] = useState(false);
   const [kilvishStatus, setKilvishStatus] = useState<"idle" | "loading" | "speaking">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +63,96 @@ export default function App() {
   const [history, setHistory] = useState<InputHistoryItem[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Router States
+  const [currentCourseId, setCurrentCourseId] = useState<string | null>(null);
+  const [courseRouteId, setCourseRouteId] = useState<string | null>(null);
+  const [courseRouteData, setCourseRouteData] = useState<any | null>(null);
+  const [isCourseLoading, setIsCourseLoading] = useState(false);
+  const [courseError, setCourseError] = useState<string | null>(null);
+  
+  // Shared Academy Library Course list
+  const [academyCourses, setAcademyCourses] = useState<any[]>([]);
+
+  const fetchAcademyCourses = async () => {
+    try {
+      const res = await fetch("/api/courses");
+      if (res.ok) {
+        const data = await res.json();
+        setAcademyCourses(data || []);
+      }
+    } catch (e) {
+      console.error("Failed to load Academy Library courses:", e);
+    }
+  };
+
+  // Monitor location path to support sharing permanent URLs cleanly
+  useEffect(() => {
+    const checkRoute = () => {
+      const pathname = window.location.pathname;
+      if (pathname.startsWith("/course/")) {
+        const id = pathname.substring("/course/".length);
+        if (id) {
+          setCourseRouteId(id);
+          fetchCourseData(id);
+        }
+      } else {
+        // Fallback search param
+        const params = new URLSearchParams(window.location.search);
+        const qId = params.get("course") || params.get("id");
+        if (qId) {
+          setCourseRouteId(qId);
+          fetchCourseData(qId);
+        } else {
+          setCourseRouteId(null);
+          setCourseRouteData(null);
+        }
+      }
+    };
+
+    // Check once on mount
+    checkRoute();
+    
+    // Also load the initial Academy Library courses list!
+    fetchAcademyCourses();
+
+    // Listen to popstate for clean back/forward history navigation!
+    window.addEventListener("popstate", checkRoute);
+    return () => window.removeEventListener("popstate", checkRoute);
+  }, []);
+
+  const fetchCourseData = async (id: string) => {
+    setIsCourseLoading(true);
+    setCourseError(null);
+    try {
+      const res = await fetch(`/api/course/${id}`);
+      if (!res.ok) {
+        throw new Error("This Courseware module does not exist or has been archived.");
+      }
+      const data = await res.json();
+      setCourseRouteData(data);
+    } catch (err: any) {
+      console.error("Fetch Course Error:", err);
+      setCourseError(err.message || "Failed to load the requested Courseware module.");
+    } finally {
+      setIsCourseLoading(false);
+    }
+  };
+
+  const handleNavigateToCourse = (id: string) => {
+    window.history.pushState({}, "", `/course/${id}`);
+    setCourseRouteId(id);
+    fetchCourseData(id);
+  };
+
+  const handleBackToWorkspace = () => {
+    window.history.pushState({}, "", "/");
+    setCourseRouteId(null);
+    setCourseRouteData(null);
+    setCourseError(null);
+    // Refresh the list of courses in case some were added
+    fetchAcademyCourses();
+  };
 
   // Load history from localStorage on mount
   useEffect(() => {
@@ -123,6 +222,7 @@ export default function App() {
     }
 
     setMode(item.mode);
+    setLanguage(item.language || "en");
     setOutput(item.simplifiedText);
     setError(null);
   };
@@ -270,6 +370,7 @@ export default function App() {
     try {
       const payload: any = {
         mode: mode,
+        language: language,
       };
 
       if (isSearchMode) {
@@ -304,7 +405,11 @@ export default function App() {
       }
 
       setOutput(data.result);
+      setCurrentCourseId(data.courseId || null);
       setKilvishStatus("idle");
+
+      // Fetch the updated Academy library courses immediately
+      fetchAcademyCourses();
 
       // Save to logs
       const finalTitle = isSearchMode 
@@ -318,6 +423,7 @@ export default function App() {
           ? `Infinity Search on "${searchTopic.trim()}"` + (inputText.trim() ? ` with focus: ${inputText.trim()}` : "")
           : (inputText.trim() || `Image text extracted from: ${fileName}`),
         mode: mode,
+        language: language,
         simplifiedText: data.result,
         timestamp: Date.now(),
         imageAttached: !isSearchMode && !!imageData,
@@ -339,323 +445,436 @@ export default function App() {
     }
   };
 
+  if (courseRouteId) {
+    if (isCourseLoading) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center space-y-4">
+          <RefreshCw className="w-10 h-10 text-indigo-600 animate-spin" />
+          <h2 className="text-sm font-mono font-extrabold uppercase text-slate-800">Retrieving Sovereign Courseware...</h2>
+          <p className="text-xs text-slate-400 font-medium">Connecting to Readability.rbaadvisor.com repository</p>
+        </div>
+      );
+    }
+
+    if (courseError || !courseRouteData) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center space-y-5">
+          <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shadow-sm">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-base font-display font-extrabold text-slate-900 uppercase">Archive Error</h2>
+            <p className="text-xs text-slate-500 font-semibold max-w-md">{courseError || "This Courseware module does not exist or has been archived."}</p>
+          </div>
+          <button
+            onClick={handleBackToWorkspace}
+            className="flex items-center gap-2 py-2 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-mono font-bold uppercase cursor-pointer"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Return to Workspace</span>
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <CoursePage
+        id={courseRouteId}
+        courseData={courseRouteData}
+        onBackToWorkspace={handleBackToWorkspace}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans flex flex-col selection:bg-slate-200 selection:text-slate-900">
       {/* Branding Header bar */}
-      <Header />
+      <Header activeTab={activeTab} setActiveTab={setActiveTab} />
 
-      {/* Main Workspace Layout */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
-        {/* Left Column (Controls & Forms): Width 5 columns on desktop */}
-        <div className="lg:col-span-5 flex flex-col gap-6 h-full">
-          
-          {/* Mr. Kilvish Persona Widget */}
-          <MrKilvishAvatar status={kilvishStatus} />
-
-          {/* Core Input Panel */}
-          <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5 flex flex-col gap-5">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h2 className="font-display font-bold text-sm text-slate-800 tracking-wider uppercase flex items-center gap-2">
-                <span className="w-1.5 h-3 bg-slate-900 rounded-full" />
-                Workspace Input
-              </h2>
-              <button
-                type="button"
-                onClick={handleWipeForm}
-                className="text-[11px] font-mono font-semibold text-slate-500 hover:text-rose-600 transition-all duration-300 flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 rounded border border-slate-200"
-              >
-                <Eraser className="w-3.5 h-3.5" />
-                Clear Workspace
-              </button>
-            </div>
-
-            {/* Error Indicator */}
-            {error && (
-              <div className="flex items-start gap-2.5 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs">
-                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                <div className="leading-relaxed">
-                  <span className="font-semibold font-mono">WORKSPACE ERROR:</span> {error}
-                </div>
-              </div>
-            )}
-
-            {/* Workspace Modes Tab Selector */}
-            <div className="flex bg-slate-100 p-1 rounded-xl">
-              <button
-                type="button"
-                onClick={() => {
-                  setInputTab("simplify");
-                  setError(null);
-                }}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-mono font-bold uppercase rounded-lg transition-all duration-200 cursor-pointer ${
-                  inputTab === "simplify"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                <FileText className="w-4.5 h-4.5" />
-                Simplify Document
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setInputTab("search");
-                  setError(null);
-                }}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-mono font-bold uppercase rounded-lg transition-all duration-200 cursor-pointer ${
-                  inputTab === "search"
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                <Infinity className="w-4.5 h-4.5" />
-                Infinity Search
-              </button>
-            </div>
-
-            <form onSubmit={handleSimplify} className="flex flex-col gap-4">
-              
-              {inputTab === "search" ? (
-                <>
-                  {/* Topic Search Input */}
-                  <div className="flex flex-col gap-1.5 animate-fadeIn">
-                    <label className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
-                      <span>Enter Topic to Explain</span>
-                      <span className="text-blue-600 font-mono text-[10px] uppercase font-bold">[Infinity Core]</span>
-                    </label>
-                    <div className="relative">
-                      <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
-                      <input
-                        type="text"
-                        placeholder="e.g., Quantum Computing, Photosynthesis, Stock Options..."
-                        value={searchTopic}
-                        onChange={(e) => setSearchTopic(e.target.value)}
-                        className="w-full bg-slate-50 text-xs text-slate-800 placeholder:text-slate-400 pl-10 pr-3.5 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-slate-300 focus:bg-white font-sans transition-all duration-300"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Suggested Topics Pills */}
-                  <div className="flex flex-col gap-1.5 animate-fadeIn">
-                    <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-bold">
-                      Suggested Topics:
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {TOPIC_SUGGESTIONS.map((topicStr) => (
-                        <button
-                          key={topicStr}
-                          type="button"
-                          onClick={() => {
-                            setSearchTopic(topicStr);
-                            setError(null);
-                          }}
-                          className="px-2.5 py-1 text-[11px] font-mono bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors border border-transparent hover:border-slate-300 cursor-pointer"
-                        >
-                          {topicStr}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Optional Extra Focus Questions */}
-                  <div className="flex flex-col gap-1.5 animate-fadeIn">
-                    <label className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
-                      <span>Focus Context / Questions (Optional)</span>
-                      <span className="text-slate-400 font-sans font-normal">[Adds precision]</span>
-                    </label>
-                    <textarea
-                      placeholder="e.g., Focus on its environmental impact, explain how it works step-by-step, or describe how it affects humans..."
-                      value={inputText}
-                      onChange={(e) => setInputText(e.target.value)}
-                      className="bg-slate-50 text-xs leading-relaxed text-slate-800 placeholder:text-slate-400 px-3.5 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-slate-300 focus:bg-white font-sans min-h-[100px] resize-y transition-all duration-300"
-                    />
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Optional Title Input */}
-                  <div className="flex flex-col gap-1.5 animate-fadeIn">
-                    <label className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
-                      <span>Workspace Label / Title</span>
-                      <span className="text-slate-400 font-sans font-normal">[Optional name for logs]</span>
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g., Medical Report Summary, NDA Page 2"
-                      value={inputTitle}
-                      onChange={(e) => setInputTitle(e.target.value)}
-                      className="bg-slate-50 text-xs text-slate-800 placeholder:text-slate-400 px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-slate-300 focus:bg-white font-sans transition-all duration-300"
-                    />
-                  </div>
-
-                  {/* Text Input area */}
-                  <div className="flex flex-col gap-1.5 animate-fadeIn">
-                    <label className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
-                      <span>Complex Text Source</span>
-                      <span className="text-slate-400 font-mono text-[10px]">
-                        {inputText.length} chars
-                      </span>
-                    </label>
-                    <textarea
-                      placeholder="Type or paste academic research, medical results, complex legal clauses, or select a Preset Example below..."
-                      value={inputText}
-                      onChange={(e) => setInputText(e.target.value)}
-                      className="bg-slate-50 text-xs leading-relaxed text-slate-800 placeholder:text-slate-400 px-3.5 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-slate-300 focus:bg-white font-sans min-h-[140px] resize-y transition-all duration-300"
-                    />
-                  </div>
-
-                  {/* Custom File Upload Component (Drag and Drop) */}
-                  <div className="flex flex-col gap-1.5 animate-fadeIn">
-                    <span className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-widest">
-                      Attach Document or Screenshot
-                    </span>
-                    <div
-                      onDragEnter={handleDrag}
-                      onDragOver={handleDrag}
-                      onDragLeave={handleDrag}
-                      onDrop={handleDrop}
-                      onClick={() => fileInputRef.current?.click()}
-                      className={`border border-dashed rounded-xl p-4 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 ${
-                        dragActive
-                          ? "border-blue-500 bg-blue-50/50"
-                          : fileName
-                          ? "border-slate-300 bg-slate-50"
-                          : "border-slate-200 hover:border-slate-300 bg-slate-50/40"
-                      }`}
-                    >
-                      <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileChange}
-                        accept=".txt,.md,.json,.csv,.js,.ts,image/*"
-                        className="hidden"
-                      />
-
-                      {fileName ? (
-                        <div className="flex items-center justify-between w-full gap-2 text-xs">
-                          <div className="flex items-center gap-2 text-slate-700 truncate">
-                            <FileText className="w-4 h-4 text-blue-600 shrink-0" />
-                            <span className="truncate font-mono font-semibold">{fileName}</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleClearFile();
-                            }}
-                            className="p-1 rounded bg-slate-100 text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-all duration-300"
-                            title="Remove file"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          <Upload className="w-5 h-5 text-slate-400 mb-2" />
-                          <p className="text-slate-700 text-[11px] font-medium">
-                            Drag & Drop or <span className="text-blue-600 font-semibold hover:underline">Browse</span>
-                          </p>
-                          <p className="text-[9px] text-slate-400 mt-1 uppercase font-mono font-semibold">
-                            TEXT (.TXT, .MD) OR IMAGE (.PNG, .JPG)
-                          </p>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Mode Selection */}
-              <ModeSelector activeMode={mode} onChange={setMode} />
-
-              {/* Submit trigger button */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full relative py-3 px-4 rounded-xl font-display font-bold text-sm uppercase tracking-wider text-white bg-slate-900 hover:bg-slate-850 active:scale-[0.99] disabled:opacity-50 transition-all duration-300 shadow-md flex items-center justify-center gap-2 cursor-pointer mt-2"
-              >
-                {isLoading ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>SYNTHESIZING...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="w-4 h-4" />
-                    <span>{inputTab === "search" ? "Search & Explain" : "Banish Jargon"}</span>
-                    <ArrowRight className="w-4 h-4 text-white" />
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
-
-          {/* Quick Examples & History Log lists */}
-          <ExamplesHistoryPanel
-            history={history}
-            onSelectExample={handleSelectExample}
-            onSelectHistory={handleSelectHistory}
-            onClearHistory={handleClearHistory}
-          />
-        </div>
-
-        {/* Right Column (Output Display & Visualizer): Width 7 columns on desktop */}
-        <div className="lg:col-span-7 flex flex-col gap-6 h-full">
-          
-          {/* Main output terminal */}
-          <OutputDisplay 
-            text={output} 
-            isLoading={isLoading} 
-            onSpeechStateChange={(isSpeaking) => {
-              setKilvishStatus(isSpeaking ? "speaking" : "idle");
+      {/* Dynamic Navigation Page Content */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-6 md:p-10 lg:p-12 xl:p-16">
+        {activeTab === "home" ? (
+          <HomeSection 
+            onStartWorkspace={() => setActiveTab("workspace")}
+            onExploreAbout={() => setActiveTab("about")}
+            onSelectTopic={(topic) => {
+              setSearchTopic(topic);
+              setInputTab("search");
+              setActiveTab("workspace");
+              setError(null);
             }}
           />
+        ) : activeTab === "about" ? (
+          <AboutSection onBackToWorkspace={() => setActiveTab("workspace")} />
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 xl:gap-14 items-start">
+            {/* Left Column (Controls & Forms): Width 5 columns on desktop */}
+            <div className="lg:col-span-5 flex flex-col gap-8 xl:gap-10 h-full">
+              
+              {/* Mr. Kilvish Persona Widget */}
+              <MrKilvishAvatar status={kilvishStatus} />
 
-          {/* Knowledge Insight Card: Simple UI decoration showing the rules in motion */}
-          <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-5 flex flex-col gap-4">
-            <div className="flex items-center gap-2">
-              <HelpCircle className="w-4 h-4 text-slate-900" />
-              <h3 className="font-display font-bold text-xs text-slate-800 uppercase tracking-wider">
-                How Readability AI Banishes Dark Jargon
-              </h3>
+              {/* Core Input Panel */}
+              <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-8 sm:p-10 flex flex-col gap-8">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <h2 className="font-display font-bold text-sm text-slate-800 tracking-wider uppercase flex items-center gap-2">
+                    <span className="w-1.5 h-3 bg-slate-900 rounded-full" />
+                    Workspace Input
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={handleWipeForm}
+                    className="text-[11px] font-mono font-semibold text-slate-500 hover:text-rose-600 transition-all duration-300 flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 rounded border border-slate-200"
+                  >
+                    <Eraser className="w-3.5 h-3.5" />
+                    Clear Workspace
+                  </button>
+                </div>
+
+                {/* Error Indicator */}
+                {error && (
+                  <div className="flex items-start gap-2.5 p-3.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                    <div className="leading-relaxed">
+                      <span className="font-semibold font-mono">WORKSPACE ERROR:</span> {error}
+                    </div>
+                  </div>
+                )}
+
+                {/* Workspace Modes Tab Selector */}
+                <div className="flex bg-slate-100 p-1 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInputTab("simplify");
+                      setError(null);
+                    }}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-mono font-bold uppercase rounded-lg transition-all duration-200 cursor-pointer ${
+                      inputTab === "simplify"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    <FileText className="w-4.5 h-4.5" />
+                    Simplify Document
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInputTab("search");
+                      setError(null);
+                    }}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-mono font-bold uppercase rounded-lg transition-all duration-200 cursor-pointer ${
+                      inputTab === "search"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    <Infinity className="w-4.5 h-4.5" />
+                    Infinity Search
+                  </button>
+                </div>
+
+                <form onSubmit={handleSimplify} className="flex flex-col gap-6">
+                  
+                  {inputTab === "search" ? (
+                    <>
+                      {/* Topic Search Input */}
+                      <div className="flex flex-col gap-1.5 animate-fadeIn">
+                        <label className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                          <span>Enter Topic to Explain</span>
+                          <span className="text-blue-600 font-mono text-[10px] uppercase font-bold">[Infinity Core]</span>
+                        </label>
+                        <div className="relative">
+                          <Search className="absolute left-3.5 top-3.5 w-4 h-4 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="e.g., Quantum Computing, Photosynthesis, Stock Options..."
+                            value={searchTopic}
+                            onChange={(e) => setSearchTopic(e.target.value)}
+                            className="w-full bg-slate-50 text-xs text-slate-800 placeholder:text-slate-400 pl-10 pr-3.5 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-slate-300 focus:bg-white font-sans transition-all duration-300"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Suggested Topics Pills */}
+                      <div className="flex flex-col gap-1.5 animate-fadeIn">
+                        <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-bold">
+                          Suggested Topics:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {TOPIC_SUGGESTIONS.map((topicStr) => (
+                            <button
+                              key={topicStr}
+                              type="button"
+                              onClick={() => {
+                                setSearchTopic(topicStr);
+                                setError(null);
+                              }}
+                              className="px-2.5 py-1 text-[11px] font-mono bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors border border-transparent hover:border-slate-300 cursor-pointer"
+                            >
+                              {topicStr}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Optional Extra Focus Questions */}
+                      <div className="flex flex-col gap-1.5 animate-fadeIn">
+                        <label className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                          <span>Focus Context / Questions (Optional)</span>
+                          <span className="text-slate-400 font-sans font-normal">[Adds precision]</span>
+                        </label>
+                        <textarea
+                          placeholder="e.g., Focus on its environmental impact, explain how it works step-by-step, or describe how it affects humans..."
+                          value={inputText}
+                          onChange={(e) => setInputText(e.target.value)}
+                          className="bg-slate-50 text-xs leading-relaxed text-slate-800 placeholder:text-slate-400 px-3.5 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-slate-300 focus:bg-white font-sans min-h-[100px] resize-y transition-all duration-300"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Optional Title Input */}
+                      <div className="flex flex-col gap-1.5 animate-fadeIn">
+                        <label className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                          <span>Workspace Label / Title</span>
+                          <span className="text-slate-400 font-sans font-normal">[Optional name for logs]</span>
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Medical Report Summary, NDA Page 2"
+                          value={inputTitle}
+                          onChange={(e) => setInputTitle(e.target.value)}
+                          className="bg-slate-50 text-xs text-slate-800 placeholder:text-slate-400 px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-slate-300 focus:bg-white font-sans transition-all duration-300"
+                        />
+                      </div>
+
+                      {/* Text Input area */}
+                      <div className="flex flex-col gap-1.5 animate-fadeIn">
+                        <label className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                          <span>Complex Text Source</span>
+                          <span className="text-slate-400 font-mono text-[10px]">
+                            {inputText.length} chars
+                          </span>
+                        </label>
+                        <textarea
+                          placeholder="Type or paste academic research, medical results, complex legal clauses, or select a Preset Example below..."
+                          value={inputText}
+                          onChange={(e) => setInputText(e.target.value)}
+                          className="bg-slate-50 text-xs leading-relaxed text-slate-800 placeholder:text-slate-400 px-3.5 py-3 rounded-xl border border-slate-200 focus:outline-none focus:border-slate-300 focus:bg-white font-sans min-h-[140px] resize-y transition-all duration-300"
+                        />
+                      </div>
+
+                      {/* Custom File Upload Component (Drag and Drop) */}
+                      <div className="flex flex-col gap-1.5 animate-fadeIn">
+                        <span className="text-[11px] font-mono font-bold text-slate-400 uppercase tracking-widest">
+                          Attach Document or Screenshot
+                        </span>
+                        <div
+                          onDragEnter={handleDrag}
+                          onDragOver={handleDrag}
+                          onDragLeave={handleDrag}
+                          onDrop={handleDrop}
+                          onClick={() => fileInputRef.current?.click()}
+                          className={`border border-dashed rounded-xl p-6 md:p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 ${
+                            dragActive
+                              ? "border-blue-500 bg-blue-50/50"
+                              : fileName
+                              ? "border-slate-300 bg-slate-50"
+                              : "border-slate-200 hover:border-slate-300 bg-slate-50/40"
+                          }`}
+                        >
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            accept=".txt,.md,.json,.csv,.js,.ts,image/*"
+                            className="hidden"
+                          />
+
+                          {fileName ? (
+                            <div className="flex items-center justify-between w-full gap-2 text-xs">
+                              <div className="flex items-center gap-2 text-slate-700 truncate">
+                                <FileText className="w-4 h-4 text-blue-600 shrink-0" />
+                                <span className="truncate font-mono font-semibold">{fileName}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleClearFile();
+                                }}
+                                className="p-1 rounded bg-slate-100 text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-all duration-300"
+                                title="Remove file"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              <Upload className="w-5 h-5 text-slate-400 mb-2" />
+                              <p className="text-slate-700 text-[11px] font-medium">
+                                Drag & Drop or <span className="text-blue-600 font-semibold hover:underline">Browse</span>
+                              </p>
+                              <p className="text-[9px] text-slate-400 mt-1 uppercase font-mono font-semibold">
+                                TEXT (.TXT, .MD) OR IMAGE (.PNG, .JPG)
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Mode Selection */}
+                  <ModeSelector activeMode={mode} onChange={setMode} />
+
+                  {/* Language Selection */}
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-mono font-bold text-slate-400 uppercase tracking-widest">
+                        Output Language
+                      </label>
+                      <span className="text-[10px] text-slate-500 font-mono font-semibold">
+                        [Alexa / Google style]
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setLanguage("en")}
+                        className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-xl border text-center transition-all duration-300 cursor-pointer ${
+                          language === "en"
+                            ? "bg-slate-900 border-slate-950 text-white shadow-sm"
+                            : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="text-base mb-0.5">🇬🇧</span>
+                        <span className="text-xs font-bold">English</span>
+                      </button>
+                      
+                      <button
+                        type="button"
+                        onClick={() => setLanguage("hi")}
+                        className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-xl border text-center transition-all duration-300 cursor-pointer ${
+                          language === "hi"
+                            ? "bg-slate-900 border-slate-950 text-white shadow-sm"
+                            : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="text-base mb-0.5">🇮🇳</span>
+                        <span className="text-xs font-bold">हिन्दी</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setLanguage("hinglish")}
+                        className={`flex flex-col items-center justify-center py-2.5 px-2 rounded-xl border text-center transition-all duration-300 cursor-pointer ${
+                          language === "hinglish"
+                            ? "bg-slate-900 border-slate-950 text-white shadow-sm"
+                            : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="text-base mb-0.5">🗣️</span>
+                        <span className="text-xs font-bold">Hinglish</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Submit trigger button */}
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full relative py-3 px-4 rounded-xl font-display font-bold text-sm uppercase tracking-wider text-white bg-slate-900 hover:bg-slate-850 active:scale-[0.99] disabled:opacity-50 transition-all duration-300 shadow-md flex items-center justify-center gap-2 cursor-pointer mt-2"
+                  >
+                    {isLoading ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        <span>SYNTHESIZING...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        <span>{inputTab === "search" ? "Search & Explain" : "Banish Jargon"}</span>
+                        <ArrowRight className="w-4 h-4 text-white" />
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+
+              {/* Quick Examples & History Log lists */}
+              <ExamplesHistoryPanel
+                history={history}
+                onSelectExample={handleSelectExample}
+                onSelectHistory={handleSelectHistory}
+                onClearHistory={handleClearHistory}
+                academyCourses={academyCourses}
+                onSelectAcademyCourse={handleNavigateToCourse}
+              />
             </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex flex-col gap-1.5">
-                <span className="font-mono text-[10px] text-blue-600 uppercase font-bold">
-                  Rule 1: No Jargon
-                </span>
-                <p className="text-slate-500 leading-relaxed text-[11px]">
-                  All complex terms are replaced or followed by instant translations inside parentheses.
-                </p>
-              </div>
 
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex flex-col gap-1.5">
-                <span className="font-mono text-[10px] text-indigo-600 uppercase font-bold">
-                  Rule 2: Structured
-                </span>
-                <p className="text-slate-500 leading-relaxed text-[11px]">
-                  Content is compartmentalized using bold key points, bullet lists, and header layouts.
-                </p>
-              </div>
+            {/* Right Column (Output Display & Visualizer): Width 7 columns on desktop */}
+            <div className="lg:col-span-7 flex flex-col gap-8 xl:gap-10 h-full">
+              
+              {/* Main output terminal */}
+              <OutputDisplay 
+                text={output} 
+                isLoading={isLoading} 
+                language={language}
+                currentCourseId={currentCourseId}
+                onSpeechStateChange={(isSpeaking) => {
+                  setKilvishStatus(isSpeaking ? "speaking" : "idle");
+                }}
+              />
 
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex flex-col gap-1.5">
-                <span className="font-mono text-[10px] text-slate-900 uppercase font-bold">
-                  Rule 3: Dual Output
-                </span>
-                <p className="text-slate-500 leading-relaxed text-[11px]">
-                  Always presented in two sections: &quot;The Core Concept&quot; and &quot;The Breakdown&quot;.
-                </p>
+              {/* Knowledge Insight Card: Simple UI decoration showing the rules in motion */}
+              <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-8 sm:p-10 flex flex-col gap-6">
+                <div className="flex items-center gap-2.5">
+                  <HelpCircle className="w-4.5 h-4.5 text-slate-900 animate-pulse" />
+                  <h3 className="font-display font-bold text-xs text-slate-800 uppercase tracking-widest">
+                    How Readability Banishes Dark Jargon
+                  </h3>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 text-xs">
+                  <div className="p-5 rounded-xl bg-slate-50 border border-slate-100 flex flex-col gap-2">
+                    <span className="font-mono text-[10px] text-blue-600 uppercase font-bold tracking-wider">
+                      Rule 1: No Jargon
+                    </span>
+                    <p className="text-slate-500 leading-relaxed text-[11px]">
+                      All complex terms are replaced or followed by instant translations inside parentheses.
+                    </p>
+                  </div>
+
+                  <div className="p-5 rounded-xl bg-slate-50 border border-slate-100 flex flex-col gap-2">
+                    <span className="font-mono text-[10px] text-indigo-600 uppercase font-bold tracking-wider">
+                      Rule 2: Structured
+                    </span>
+                    <p className="text-slate-500 leading-relaxed text-[11px]">
+                      Content is compartmentalized using bold key points, bullet lists, and header layouts.
+                    </p>
+                  </div>
+
+                  <div className="p-5 rounded-xl bg-slate-50 border border-slate-100 flex flex-col gap-2">
+                    <span className="font-mono text-[10px] text-slate-900 uppercase font-bold tracking-wider">
+                      Rule 3: Dual Output
+                    </span>
+                    <p className="text-slate-500 leading-relaxed text-[11px]">
+                      Always presented in two sections: &quot;The Core Concept&quot; and &quot;The Breakdown&quot;.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </main>
 
       {/* Decorative clean footer */}
       <footer className="border-t border-slate-200 py-6 text-center text-xs font-mono text-slate-400 bg-white mt-auto font-semibold">
-        <p>&copy; {new Date().getFullYear()} READABILITY AI. ALL RIGHTS OF CLARITY PRESERVED.</p>
+        <p>&copy; {new Date().getFullYear()} READABILITY. ALL RIGHTS OF CLARITY PRESERVED.</p>
         <p className="text-[10px] mt-1 text-slate-400">POWERED BY GEMINI-3.5-FLASH &bull; CORE ENGINE: MR. KILVISH</p>
       </footer>
     </div>
