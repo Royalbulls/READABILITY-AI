@@ -12,6 +12,7 @@ export interface InputHistoryItem {
   language?: OutputLanguage;
   title: string;
   timestamp: number;
+  rating?: number;
 }
 
 export interface ExampleItem {

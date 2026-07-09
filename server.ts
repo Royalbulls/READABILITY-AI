@@ -2,13 +2,14 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse, Modality } from "@google/genai";
 import dotenv from "dotenv";
 
 // Load environment variables
 dotenv.config();
 
 const COURSES_FILE = path.join(process.cwd(), "courses.json");
+const COMMUNITY_FILE = path.join(process.cwd(), "community.json");
 
 // Safe helper to read courses
 async function readCourses(): Promise<Record<string, any>> {
@@ -21,6 +22,29 @@ async function readCourses(): Promise<Record<string, any>> {
   } catch (err) {
     console.error("Error reading courses file, returning empty:", err);
     return {};
+  }
+}
+
+// Safe helper to read community
+async function readCommunity(): Promise<Record<string, any>> {
+  try {
+    if (!fs.existsSync(COMMUNITY_FILE)) {
+      return {};
+    }
+    const data = await fs.promises.readFile(COMMUNITY_FILE, "utf-8");
+    return JSON.parse(data || "{}");
+  } catch (err) {
+    console.error("Error reading community file, returning empty:", err);
+    return {};
+  }
+}
+
+// Safe helper to save community
+async function saveCommunity(data: Record<string, any>): Promise<void> {
+  try {
+    await fs.promises.writeFile(COMMUNITY_FILE, JSON.stringify(data, null, 2), "utf-8");
+  } catch (err) {
+    console.error("Error saving community file:", err);
   }
 }
 
@@ -71,7 +95,6 @@ async function generateContentWithRetryAndFallback(
   const modelsToTry = [
     "gemini-3.5-flash",
     "gemini-3.1-flash-lite",
-    "gemini-2.5-flash",
     "gemini-flash-latest"
   ];
   let lastError: any = null;
@@ -119,7 +142,7 @@ async function generateContentWithRetryAndFallback(
           (error.status && error.status === 403) ||
           (error.code && error.code === 403);
 
-        console.warn(`[Readability AI] Error using model ${model} (attempt ${attempt}/${attempts}):`, errorMessage);
+        console.log(`[Readability AI] Transient notice: Model ${model} on (attempt ${attempt}/${attempts}) is busy or exhausted.`, errorMessage);
 
         if (isAuthError) {
           // If it's an API Key / authentication issue, fail immediately since other models will also fail
@@ -127,14 +150,14 @@ async function generateContentWithRetryAndFallback(
         }
 
         if (isQuotaExceeded) {
-          console.warn(`[Readability AI] Quota exceeded (429/RESOURCE_EXHAUSTED) for model ${model}. Falling back immediately.`);
+          console.log(`[Readability AI] Quota exceeded (429/RESOURCE_EXHAUSTED) for model ${model}. Falling back immediately.`);
           break; // Break the attempt loop to try the next model
         }
 
         if (!isTransient) {
           // For other non-transient errors (like model not found or invalid config for this model), 
           // skip retrying this model and fall back to the next model immediately.
-          console.warn(`[Readability AI] Non-transient error for model ${model}. Falling back to next model.`);
+          console.log(`[Readability AI] Non-transient condition for model ${model}. Falling back to next model.`);
           break;
         }
 
@@ -145,7 +168,7 @@ async function generateContentWithRetryAndFallback(
         }
       }
     }
-    console.log(`[Readability AI] Model ${model} failed or skipped. Trying next model if available...`);
+    console.log(`[Readability AI] Model ${model} skipped or exhausted. Trying next model if available...`);
   }
 
   throw lastError || new Error("Failed to generate content after trying multiple models and retries.");
@@ -168,10 +191,62 @@ async function startServer() {
     res.json({ hasApiKey: !!process.env.GEMINI_API_KEY });
   });
 
+  // API: High-Quality Gemini Text-to-Speech Engine
+  app.post("/api/tts", async (req, res) => {
+    try {
+      const { text, voiceName = "Zephyr" } = req.body;
+      if (!text) {
+        return res.status(400).json({ error: "Text is required for TTS." });
+      }
+
+      // Deep text cleaning to eliminate markdown characters, tables, links and bullet noise
+      const cleanText = text
+        .replace(/[#*`~_\-]/g, " ") // Clean markdown syntax with visual pauses
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // Simplify markdown links to display-only text
+        .replace(/✔|✅/g, " Yes. ")
+        .replace(/⚠️|❌/g, " Warning. ")
+        .replace(/💡/g, " Key Tip. ")
+        .replace(/\|/g, " ") // Clean up tables
+        .replace(/\s+/g, " ") // Normalize multiple spaces
+        .trim();
+
+      // Gemini TTS has an ideal length. 1500 chars is plenty for active study paragraphs.
+      const textToSpeak = cleanText.slice(0, 1500);
+
+      const client = getGeminiClient();
+
+      console.log(`[Gemini TTS] Generating speech using voice: ${voiceName}`);
+      const response = await client.models.generateContent({
+        model: "gemini-3.1-flash-tts-preview",
+        contents: [{ parts: [{ text: textToSpeak }] }],
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName },
+            },
+          },
+        },
+      });
+
+      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+      if (!base64Audio) {
+        throw new Error("No audio content returned from the premium TTS engine.");
+      }
+
+      res.json({ audio: base64Audio });
+    } catch (error: any) {
+      console.error("[Gemini TTS Error]:", error);
+      res.status(500).json({ 
+        error: error.message || "Failed to generate premium AI voice narrative." 
+      });
+    }
+  });
+
   // API: Main simplification endpoint
   app.post("/api/simplify", async (req, res) => {
     try {
-      const { text, image, mode, topic, language } = req.body;
+      const { text, image, mode, topic, language, isPrivate } = req.body;
 
       if (!text && !image && !topic) {
         return res.status(400).json({ error: "Input text, image, or search topic is required." });
@@ -347,6 +422,7 @@ CRITICAL PUBLISHING QUALITY STANDARDS (10/10):
         language: language || "en",
         topic: topic || "",
         originalText: text || "",
+        isPrivate: isPrivate === true,
       });
 
       res.json({ result: resultText, courseId });
@@ -379,12 +455,144 @@ CRITICAL PUBLISHING QUALITY STANDARDS (10/10):
   app.get("/api/courses", async (req, res) => {
     try {
       const courses = await readCourses();
-      // Return as an array sorted by timestamp descending
-      const list = Object.values(courses).sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0));
+      // Return as an array sorted by timestamp descending, filtering out private ones
+      const list = Object.values(courses)
+        .filter((c: any) => !c.isPrivate)
+        .sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0));
       res.json(list);
     } catch (error: any) {
       console.error("Error retrieving courses:", error);
       res.status(500).json({ error: "Failed to retrieve Courseware Library." });
+    }
+  });
+
+  // API: Get community data for a course
+  app.get("/api/community/:courseId", async (req, res) => {
+    try {
+      const { courseId } = req.params;
+      const communityData = await readCommunity();
+      
+      // If no community data exists yet for this course, initialize a default structure
+      if (!communityData[courseId]) {
+        communityData[courseId] = {
+          ratings: [5, 5, 4], // Initial ratings seed
+          questions: [],
+          explanations: [],
+          notes: [],
+          examples: [],
+          related: []
+        };
+        await saveCommunity(communityData);
+      }
+      
+      res.json(communityData[courseId]);
+    } catch (error: any) {
+      console.error("Error retrieving community data:", error);
+      res.status(500).json({ error: "Failed to retrieve community hub." });
+    }
+  });
+
+  // API: Post new community item
+  app.post("/api/community/:courseId", async (req, res) => {
+    try {
+      const { courseId } = req.params;
+      const { type, payload } = req.body;
+      
+      const communityData = await readCommunity();
+      if (!communityData[courseId]) {
+        communityData[courseId] = {
+          ratings: [5, 5, 4],
+          questions: [],
+          explanations: [],
+          notes: [],
+          examples: [],
+          related: []
+        };
+      }
+      
+      const target = communityData[courseId];
+      const item = {
+        id: "item-" + Math.random().toString(36).substring(2, 9),
+        timestamp: Date.now(),
+        ...payload
+      };
+
+      if (type === "rating") {
+        const ratingVal = parseInt(payload.rating);
+        if (ratingVal >= 1 && ratingVal <= 5) {
+          target.ratings.push(ratingVal);
+        }
+      } else if (type === "question") {
+        target.questions.push(item);
+      } else if (type === "note") {
+        target.notes.push(item);
+      } else if (type === "example") {
+        target.examples.push(item);
+      } else if (type === "explanation") {
+        target.explanations.push(item);
+      } else if (type === "related") {
+        if (!target.related.includes(payload.topic)) {
+          target.related.push(payload.topic);
+        }
+      }
+      
+      communityData[courseId] = target;
+      await saveCommunity(communityData);
+      res.json(communityData[courseId]);
+    } catch (error: any) {
+      console.error("Error saving community item:", error);
+      res.status(500).json({ error: "Failed to post to community hub." });
+    }
+  });
+
+  // API: AI-generate answers/explanations/examples on demand for Community
+  app.post("/api/community/:courseId/ai-generate", async (req, res) => {
+    try {
+      const { courseId } = req.params;
+      const { type, questionText, topicTitle, courseText } = req.body;
+      
+      const client = getGeminiClient();
+      let promptText = "";
+      
+      if (type === "answer_question") {
+        promptText = `You are Mr. Kilvish, the dean of Readability AI. Answer the following student question regarding "${topicTitle}":
+Question: "${questionText}"
+Reference course text:
+"""
+${courseText}
+"""
+Provide an elegant, extremely simple, conversational, and direct answer. Skip any preamble. Output directly in clean markdown.`;
+      } else if (type === "better_explanation") {
+        promptText = `You are Mr. Kilvish. Provide an alternative, EVEN SIMPLER, ultra-simplified explanation/analogy of "${topicTitle}".
+Reference course text:
+"""
+${courseText}
+"""
+Focus on an incredible, high-impact everyday analogy (like using a mailbox to explain IP addresses, or baking bread to explain CPU cycles). Skip any introduction. Output directly in clean markdown.`;
+      } else if (type === "new_example") {
+        promptText = `You are Mr. Kilvish. Generate a concrete, real-world community example of how "${topicTitle}" is used in action.
+Reference course text:
+"""
+${courseText}
+"""
+Keep it extremely practical, fun, and memorable. Skip any introduction. Output directly in clean markdown.`;
+      } else if (type === "related_topics") {
+        promptText = `You are Mr. Kilvish. List exactly 4 highly related topics or follow-up areas of study for someone who just finished learning "${topicTitle}".
+Return only a JSON array of strings, like this: ["Topic A", "Topic B", "Topic C", "Topic D"]. Do not return any other text.`;
+      }
+
+      const response = await generateContentWithRetryAndFallback(client, {
+        contents: [{ text: promptText }],
+        config: {
+          temperature: 0.5,
+        }
+      });
+
+      const reply = response.text || "";
+      res.json({ result: reply });
+    } catch (error: any) {
+      console.error("Community AI generation error:", error);
+      res.status(500).json({ error: "Failed to trigger AI helper." });
     }
   });
 

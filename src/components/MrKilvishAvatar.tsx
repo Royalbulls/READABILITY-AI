@@ -7,7 +7,7 @@ interface MrKilvishAvatarProps {
 
 export default function MrKilvishAvatar({ status }: MrKilvishAvatarProps) {
   return (
-    <div className="relative flex flex-col items-center justify-center p-6 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="relative flex flex-col items-center justify-center p-4 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       {/* Ambient background glows */}
       <div className={`absolute -inset-10 rounded-full blur-3xl opacity-10 transition-all duration-1000 ${
         status === "loading"
@@ -18,7 +18,7 @@ export default function MrKilvishAvatar({ status }: MrKilvishAvatarProps) {
       }`} />
 
       {/* Futuristic Cybernetic Core Orb */}
-      <div className="relative w-24 h-24 flex items-center justify-center z-10">
+      <div className="relative w-20 h-20 flex items-center justify-center z-10">
         {/* Outer rotating/pulsing ring */}
         <div className={`absolute inset-0 rounded-full border border-dashed transition-all duration-1000 ${
           status === "loading"
@@ -29,7 +29,7 @@ export default function MrKilvishAvatar({ status }: MrKilvishAvatarProps) {
         }`} />
 
         {/* Middle pulsing glow ring */}
-        <div className={`absolute w-20 h-20 rounded-full border border-slate-100 flex items-center justify-center transition-all duration-700 ${
+        <div className={`absolute w-16 h-16 rounded-full border border-slate-100 flex items-center justify-center transition-all duration-700 ${
           status === "loading"
             ? "scale-105 bg-blue-50 border-blue-200 shadow-[0_0_15px_rgba(59,130,246,0.15)]"
             : status === "speaking"
@@ -37,7 +37,7 @@ export default function MrKilvishAvatar({ status }: MrKilvishAvatarProps) {
             : "bg-slate-50"
         }`}>
           {/* Inner Core Shield / Icon */}
-          <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-500 ${
+          <div className={`w-11 h-11 rounded-full flex items-center justify-center transition-all duration-500 ${
             status === "loading"
               ? "bg-blue-100 text-blue-600"
               : status === "speaking"
@@ -45,22 +45,22 @@ export default function MrKilvishAvatar({ status }: MrKilvishAvatarProps) {
               : "bg-slate-100 text-slate-700"
           }`}>
             {status === "loading" ? (
-              <Zap className="w-6 h-6 animate-bounce" />
+              <Zap className="w-5 h-5 animate-bounce" />
             ) : status === "speaking" ? (
-              <Sparkles className="w-6 h-6 animate-pulse" />
+              <Sparkles className="w-5 h-5 animate-pulse" />
             ) : (
-              <Shield className="w-6 h-6" />
+              <Shield className="w-5 h-5" />
             )}
           </div>
         </div>
 
         {/* Dynamic soundwaves or scanning lines when speaking or loading */}
         {status === "speaking" && (
-          <div className="absolute -bottom-1 flex items-end gap-1 h-5">
-            <span className="w-1 bg-indigo-400 rounded-full animate-[bounce_0.8s_infinite] h-3" />
-            <span className="w-1 bg-indigo-500 rounded-full animate-[bounce_0.5s_infinite] h-5" />
-            <span className="w-1 bg-indigo-400 rounded-full animate-[bounce_0.7s_infinite] h-2" />
-            <span className="w-1 bg-indigo-600 rounded-full animate-[bounce_0.6s_infinite] h-4" />
+          <div className="absolute -bottom-1 flex items-end gap-1 h-4">
+            <span className="w-1 bg-indigo-400 rounded-full animate-[bounce_0.8s_infinite] h-2.5" />
+            <span className="w-1 bg-indigo-500 rounded-full animate-[bounce_0.5s_infinite] h-4" />
+            <span className="w-1 bg-indigo-400 rounded-full animate-[bounce_0.7s_infinite] h-1.5" />
+            <span className="w-1 bg-indigo-600 rounded-full animate-[bounce_0.6s_infinite] h-3" />
           </div>
         )}
 
@@ -70,14 +70,14 @@ export default function MrKilvishAvatar({ status }: MrKilvishAvatarProps) {
       </div>
 
       {/* Name and Tagline */}
-      <div className="mt-4 text-center z-10">
+      <div className="mt-2.5 text-center z-10">
         <div className="flex items-center justify-center gap-1.5">
           <Terminal className="w-3.5 h-3.5 text-slate-850" />
-          <h3 className="font-display font-bold text-slate-900 text-sm tracking-wide uppercase">
+          <h3 className="font-display font-bold text-slate-900 text-xs tracking-wide uppercase">
             MR. KILVISH V2.5
           </h3>
         </div>
-        <p className="text-slate-500 text-[10px] mt-1 uppercase tracking-widest font-mono font-semibold">
+        <p className="text-slate-500 text-[9px] mt-0.5 uppercase tracking-widest font-mono font-bold">
           {status === "loading"
             ? "DECODING COMPLEXITY..."
             : status === "speaking"
@@ -87,7 +87,7 @@ export default function MrKilvishAvatar({ status }: MrKilvishAvatarProps) {
       </div>
 
       {/* Dialog box / Quote from Kilvish */}
-      <div className="mt-4 px-3 py-2 bg-slate-50 rounded-lg border border-slate-100 text-center text-xs font-mono max-w-[280px]">
+      <div className="mt-2.5 px-2.5 py-1.5 bg-slate-50 rounded-lg border border-slate-100 text-center text-[11px] font-mono max-w-[280px]">
         {status === "loading" ? (
           <span className="text-blue-600 animate-pulse">
             &quot;Banish the darkness... Jargon cannot hide from my analytical light.&quot;

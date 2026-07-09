@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { jsPDF } from "jspdf";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { 
@@ -34,7 +35,12 @@ import {
   ArrowRight,
   Eye,
   Activity,
-  Cpu
+  Cpu,
+  Star,
+  Play,
+  Pause,
+  Sliders,
+  Zap
 } from "lucide-react";
 import { OutputLanguage } from "../types";
 
@@ -131,12 +137,86 @@ interface OutputDisplayProps {
   language?: OutputLanguage;
   onSpeechStateChange?: (isSpeaking: boolean) => void;
   currentCourseId?: string | null;
+  rating?: number;
+  onRate?: (rating: number) => void;
 }
 
-export default function OutputDisplay({ text, isLoading, language = "en", onSpeechStateChange, currentCourseId }: OutputDisplayProps) {
+export default function OutputDisplay({ text, isLoading, language = "en", onSpeechStateChange, currentCourseId, rating, onRate }: OutputDisplayProps) {
   const [copied, setCopied] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechUtterance, setSpeechUtterance] = useState<SpeechSynthesisUtterance | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  // Premium Gemini TTS states & refs
+  const [ttsEngine, setTtsEngine] = useState<"gemini" | "webspeech">("gemini");
+  const [isTtsLoading, setIsTtsLoading] = useState(false);
+  const [premiumVoice, setPremiumVoice] = useState<string>("Zephyr"); // Puck, Charon, Kore, Fenrir, Zephyr
+  const premiumAudioCtxRef = useRef<AudioContext | null>(null);
+  const premiumAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+
+  // Stop narration if the component unmounts
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      if (premiumAudioSourceRef.current) {
+        try {
+          premiumAudioSourceRef.current.stop();
+        } catch (e) {}
+      }
+      if (premiumAudioCtxRef.current) {
+        try {
+          premiumAudioCtxRef.current.close();
+        } catch (e) {}
+      }
+    };
+  }, []);
+
+  // Typewriter animation states
+  const [displayedText, setDisplayedText] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+
+  const [speechRate, setSpeechRate] = useState(1.0);
+  const [speechPitch, setSpeechPitch] = useState(0.95);
+  const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | null>(null);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+
+  // Robustly load and matching voices available in the client browser
+  useEffect(() => {
+    const updateVoices = () => {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        const voices = window.speechSynthesis.getVoices();
+        setAvailableVoices(voices);
+        
+        // Auto-select optimal voice: strongly prioritize Hindi India (hi_IN / hi-IN)
+        let optimal = voices.find(v => v.lang.replace("_", "-").toLowerCase() === "hi-in" || v.lang.toLowerCase().startsWith("hi") || v.name.toLowerCase().includes("hindi") || v.name.toLowerCase().includes("india"));
+        if (!optimal) {
+          optimal = voices.find(v => v.name.toLowerCase().includes("aura"));
+        }
+        if (!optimal) {
+          if (language === "hinglish") {
+            optimal = voices.find(v => (v.lang.includes("IN") && v.lang.startsWith("en")) || v.lang.startsWith("hi"));
+          }
+          if (!optimal) {
+            optimal = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Male") || v.name.includes("India")));
+          }
+          if (!optimal && voices.length > 0) {
+            optimal = voices.find(v => v.lang.startsWith("en"));
+          }
+          if (!optimal && voices.length > 0) {
+            optimal = voices[0];
+          }
+        }
+        setSelectedVoice(optimal || null);
+      }
+    };
+
+    updateVoices();
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = updateVoices;
+    }
+  }, [language]);
 
   // Digital courseware verification states
   const [issuedCode, setIssuedCode] = useState("");
@@ -166,6 +246,52 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
       setUserXp(100);
     }
   }, [text]);
+
+  // Typewriter animation effect
+  useEffect(() => {
+    if (isLoading) {
+      setDisplayedText("");
+      setIsTyping(false);
+      return;
+    }
+
+    if (!text) {
+      setDisplayedText("");
+      setIsTyping(false);
+      return;
+    }
+
+    // Determine typewriter parameters based on text length to guarantee a fast but engaging animation
+    const totalChars = text.length;
+    const totalDuration = 2000; // Target total animation time of 2.0 seconds
+    const intervalMs = 15; // Fast interval for fluid appearance
+    const totalSteps = totalDuration / intervalMs; // ~133 steps
+    const charsPerStep = Math.max(1, Math.ceil(totalChars / totalSteps));
+
+    setDisplayedText("");
+    setIsTyping(true);
+
+    let currentIndex = 0;
+    const intervalId = setInterval(() => {
+      currentIndex += charsPerStep;
+      if (currentIndex >= totalChars) {
+        setDisplayedText(text);
+        setIsTyping(false);
+        clearInterval(intervalId);
+      } else {
+        setDisplayedText(text.slice(0, currentIndex));
+      }
+    }, intervalMs);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [text, isLoading]);
+
+  const skipTypewriter = () => {
+    setDisplayedText(text);
+    setIsTyping(false);
+  };
 
   const handleToggleChapter = (chapterTitle: string) => {
     setCompletedChapters((prev) => {
@@ -886,6 +1012,298 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
     URL.revokeObjectURL(url);
   };
 
+  const handleExportPDF = () => {
+    try {
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4"
+      });
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 20;
+      const contentWidth = pageWidth - (margin * 2); // 170mm
+
+      // Metadata & Styling Colors
+      const primaryColor = [15, 23, 42]; // Slate-900: #0f172a
+      const accentColor = [79, 70, 229]; // Indigo-600: #4f46e5
+      const secondaryColor = [51, 65, 85]; // Slate-700: #334155
+      const bodyColor = [30, 41, 59]; // Slate-800: #1e293b
+      const lightBg = [248, 250, 252]; // Slate-50: #f8fafc
+      const borderColor = [226, 232, 240]; // Slate-200: #e2e8f0
+
+      let currentPage = 1;
+
+      // Helper function to draw header/footer on a page
+      const drawHeaderFooter = (pageNum: number) => {
+        doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        // Top accent line
+        doc.rect(0, 0, pageWidth, 4, "F");
+
+        // Running Header
+        doc.setFont("Helvetica", "bold");
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184); // Slate-400
+        doc.text("MR. KILVISH CLARITY HUB", margin, 12);
+        
+        doc.setFont("Helvetica", "normal");
+        doc.text("SIMPLIFIED LEARNING PLATFORM", pageWidth - margin - 52, 12);
+
+        // Header separator line
+        doc.setDrawColor(241, 245, 249); // Slate-100
+        doc.setLineWidth(0.3);
+        doc.line(margin, 15, pageWidth - margin, 15);
+
+        // Running Footer
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184); // Slate-400
+        doc.text(`Generated on ${new Date().toLocaleDateString()}`, margin, pageHeight - 12);
+        doc.text(`Page ${pageNum}`, pageWidth - margin - 15, pageHeight - 12);
+        
+        // Footer separator line
+        doc.line(margin, pageHeight - 16, pageWidth - margin, pageHeight - 16);
+      };
+
+      // Let's create a cover or introduction header section at the top of page 1!
+      drawHeaderFooter(currentPage);
+
+      // Document Title/Banner
+      let y = 28;
+      
+      doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+      doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
+      doc.setLineWidth(0.5);
+      // Beautiful rounded-like title box
+      doc.rect(margin, y, contentWidth, 24, "F");
+      doc.rect(margin, y, contentWidth, 24, "S");
+
+      // Left vertical accent line inside the box
+      doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
+      doc.rect(margin + 1, y + 1, 3, 22, "F");
+
+      doc.setFont("Helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+      doc.text("CLARITY COURSEWARE REPORT", margin + 8, y + 9);
+
+      doc.setFont("Helvetica", "italic");
+      doc.setFontSize(9);
+      doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+      doc.text("Demystified & Jargon-Free Textbook Block", margin + 8, y + 15);
+
+      doc.setFont("Helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139); // Slate-500
+      doc.text(`Access Key Issued: ${issuedCode || "ACTIVE-KEY"}`, margin + 8, y + 20);
+
+      y += 34; // Shift y below the title block
+
+      // Parse and print the markdown content
+      const lines = text.split("\n");
+      
+      const checkNewPage = (neededHeight: number) => {
+        if (y + neededHeight > pageHeight - 22) {
+          doc.addPage();
+          currentPage++;
+          drawHeaderFooter(currentPage);
+          y = 25; // Reset y for new page
+        }
+      };
+
+      lines.forEach((line) => {
+        const trimmedLine = line.trim();
+        if (!trimmedLine) {
+          // Empty line: add a small paragraph space
+          y += 4;
+          return;
+        }
+
+        // 1. Heading 1: e.g. "# Heading 1"
+        if (trimmedLine.startsWith("# ")) {
+          const headingText = trimmedLine.replace("# ", "").trim();
+          checkNewPage(18);
+          
+          y += 4;
+          doc.setFont("Helvetica", "bold");
+          doc.setFontSize(15);
+          doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+          const splitHeading = doc.splitTextToSize(headingText, contentWidth);
+          splitHeading.forEach((subLine: string) => {
+            doc.text(subLine, margin, y);
+            y += 5.5;
+          });
+          
+          // Underline
+          y += 1;
+          doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
+          doc.setLineWidth(0.6);
+          doc.line(margin, y, margin + 45, y);
+          y += 6;
+        }
+        // 2. Heading 2: e.g. "## Heading 2"
+        else if (trimmedLine.startsWith("## ")) {
+          const headingText = trimmedLine.replace("## ", "").trim();
+          checkNewPage(14);
+
+          y += 4;
+          doc.setFont("Helvetica", "bold");
+          doc.setFontSize(12);
+          doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+          const splitHeading = doc.splitTextToSize(headingText, contentWidth);
+          splitHeading.forEach((subLine: string) => {
+            doc.text(subLine, margin, y);
+            y += 5;
+          });
+          y += 3;
+        }
+        // 3. Heading 3: e.g. "### Heading 3"
+        else if (trimmedLine.startsWith("### ")) {
+          const headingText = trimmedLine.replace("### ", "").trim();
+          checkNewPage(12);
+
+          y += 3;
+          doc.setFont("Helvetica", "bold");
+          doc.setFontSize(10.5);
+          doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+          const splitHeading = doc.splitTextToSize(headingText, contentWidth);
+          splitHeading.forEach((subLine: string) => {
+            doc.text(subLine, margin, y);
+            y += 4.5;
+          });
+          y += 2.5;
+        }
+        // 4. Bullet list items: e.g. "- Item" or "* Item"
+        else if (trimmedLine.startsWith("- ") || trimmedLine.startsWith("* ")) {
+          const rawItemText = trimmedLine.substring(2).trim();
+          
+          // Strip simple formatting markdown like `**` or `*` or `__` or `_`
+          const cleanedItemText = rawItemText
+            .replace(/\*\*/g, "")
+            .replace(/__/g, "")
+            .replace(/\*/g, "")
+            .replace(/_/g, "");
+
+          doc.setFont("Helvetica", "normal");
+          doc.setFontSize(10);
+          doc.setTextColor(bodyColor[0], bodyColor[1], bodyColor[2]);
+
+          const splitText = doc.splitTextToSize(cleanedItemText, contentWidth - 8);
+          
+          splitText.forEach((subLine: string, index: number) => {
+            checkNewPage(6);
+            if (index === 0) {
+              // Draw a bullet dot
+              doc.setFont("Helvetica", "bold");
+              doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+              doc.text("\u2022", margin + 2, y);
+              
+              doc.setFont("Helvetica", "normal");
+              doc.setTextColor(bodyColor[0], bodyColor[1], bodyColor[2]);
+              doc.text(subLine, margin + 6, y);
+            } else {
+              doc.text(subLine, margin + 6, y);
+            }
+            y += 5.2;
+          });
+        }
+        // 5. Numbered lists: e.g. "1. Item"
+        else if (/^\d+\.\s/.test(trimmedLine)) {
+          const matchResult = trimmedLine.match(/^(\d+\.)\s(.*)/);
+          if (matchResult) {
+            const numPrefix = matchResult[1];
+            const rawItemText = matchResult[2].trim();
+            const cleanedItemText = rawItemText
+              .replace(/\*\*/g, "")
+              .replace(/__/g, "")
+              .replace(/\*/g, "")
+              .replace(/_/g, "");
+
+            doc.setFont("Helvetica", "normal");
+            doc.setFontSize(10);
+            doc.setTextColor(bodyColor[0], bodyColor[1], bodyColor[2]);
+
+            const splitText = doc.splitTextToSize(cleanedItemText, contentWidth - 8);
+            
+            splitText.forEach((subLine: string, index: number) => {
+              checkNewPage(6);
+              if (index === 0) {
+                // Draw numbers
+                doc.setFont("Helvetica", "bold");
+                doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+                doc.text(numPrefix, margin + 1, y);
+                
+                doc.setFont("Helvetica", "normal");
+                doc.setTextColor(bodyColor[0], bodyColor[1], bodyColor[2]);
+                doc.text(subLine, margin + 7, y);
+              } else {
+                doc.text(subLine, margin + 7, y);
+              }
+              y += 5.2;
+            });
+          }
+        }
+        // 6. Blockquote or custom tip: e.g. "> Text"
+        else if (trimmedLine.startsWith("> ")) {
+          const blockText = trimmedLine.substring(2).trim();
+          const cleanedText = blockText
+            .replace(/\*\*/g, "")
+            .replace(/__/g, "")
+            .replace(/\*/g, "")
+            .replace(/_/g, "");
+
+          doc.setFont("Helvetica", "italic");
+          doc.setFontSize(9.5);
+          doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+
+          const splitText = doc.splitTextToSize(cleanedText, contentWidth - 12);
+          
+          // Draw block bg box
+          const boxHeight = (splitText.length * 5.2) + 4;
+          checkNewPage(boxHeight);
+
+          doc.setFillColor(lightBg[0], lightBg[1], lightBg[2]);
+          doc.rect(margin, y - 1, contentWidth, boxHeight, "F");
+
+          // Left border for blockquote
+          doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
+          doc.rect(margin, y - 1, 1.5, boxHeight, "F");
+
+          splitText.forEach((subLine: string) => {
+            doc.text(subLine, margin + 5, y + 2.5);
+            y += 5.2;
+          });
+          y += 3;
+        }
+        // 7. Standard Paragraph
+        else {
+          const cleanedText = trimmedLine
+            .replace(/\*\*/g, "")
+            .replace(/__/g, "")
+            .replace(/\*/g, "")
+            .replace(/_/g, "");
+
+          doc.setFont("Helvetica", "normal");
+          doc.setFontSize(10);
+          doc.setTextColor(bodyColor[0], bodyColor[1], bodyColor[2]);
+
+          const splitText = doc.splitTextToSize(cleanedText, contentWidth);
+          
+          splitText.forEach((subLine: string) => {
+            checkNewPage(6);
+            doc.text(subLine, margin, y);
+            y += 5.2;
+          });
+        }
+      });
+
+      // Save document
+      doc.save("Simplified_by_ReadabilityAI.pdf");
+    } catch (error) {
+      console.error("Failed to generate PDF document", error);
+    }
+  };
+
   const handlePrint = () => {
     // Attempt to open a styled print preview window
     const printWindow = window.open("", "_blank");
@@ -928,58 +1346,202 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
     }
   };
 
-  const handleSpeech = () => {
+  const handleSpeech = async () => {
+    if (!text) return;
+
     if (isSpeaking) {
-      window.speechSynthesis.cancel();
+      // STOP PLAYING (Both engines)
+      if (ttsEngine === "gemini") {
+        if (premiumAudioSourceRef.current) {
+          try {
+            premiumAudioSourceRef.current.onended = null;
+            premiumAudioSourceRef.current.stop();
+          } catch (e) {}
+          premiumAudioSourceRef.current = null;
+        }
+      } else {
+        if (utteranceRef.current) {
+          utteranceRef.current.onend = null;
+          utteranceRef.current.onerror = null;
+        }
+        if (typeof window !== "undefined" && window.speechSynthesis) {
+          window.speechSynthesis.cancel();
+        }
+      }
       setIsSpeaking(false);
       if (onSpeechStateChange) onSpeechStateChange(false);
       return;
     }
 
-    if (!text) return;
+    if (ttsEngine === "gemini") {
+      // 1. PREMIUM GEMINI TTS FLOW
+      try {
+        setIsTtsLoading(true);
 
-    // Clean text of markdown characters before speaking for smoother reading
-    const cleanText = text
-      .replace(/[#*`~_]/g, "") // Remove markdown syntax
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1"); // Keep link text, discard urls
+        // Cancel any existing playing audio first
+        if (premiumAudioSourceRef.current) {
+          try { premiumAudioSourceRef.current.stop(); } catch(e){}
+          premiumAudioSourceRef.current = null;
+        }
 
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    
-    // Attempt to select an appropriate voice based on language
-    const voices = window.speechSynthesis.getVoices();
-    let optimalVoice;
-    
-    if (language === "hi") {
-      optimalVoice = voices.find(v => v.lang.startsWith("hi") || v.lang.startsWith("in"));
-    } else if (language === "hinglish") {
-      optimalVoice = voices.find(v => (v.lang.includes("IN") && v.lang.startsWith("en")) || v.lang.startsWith("hi"));
+        const response = await fetch("/api/tts", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            text: text,
+            voiceName: premiumVoice
+          })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.error || "Failed to fetch AI narration.");
+        }
+
+        const data = await response.json();
+        if (!data.audio) {
+          throw new Error("No audio payload received.");
+        }
+
+        // Play the raw 16-bit PCM little-endian audio at 24000Hz using Web Audio API
+        const base64Data = data.audio;
+        const binaryString = window.atob(base64Data);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const arrayBuffer = bytes.buffer;
+
+        // Convert little-endian 16-bit PCM buffer to Float32 [-1.0, 1.0]
+        const int16Data = new Int16Array(arrayBuffer);
+        const float32Data = new Float32Array(int16Data.length);
+        for (let i = 0; i < int16Data.length; i++) {
+          float32Data[i] = int16Data[i] / 32768.0;
+        }
+
+        // Initialize AudioContext
+        const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
+        const audioCtx = new AudioCtxClass({ sampleRate: 24000 });
+        premiumAudioCtxRef.current = audioCtx;
+
+        const audioBuffer = audioCtx.createBuffer(1, float32Data.length, 24000);
+        audioBuffer.getChannelData(0).set(float32Data);
+
+        const source = audioCtx.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioCtx.destination);
+        
+        premiumAudioSourceRef.current = source;
+
+        // Handle audio end
+        source.onended = () => {
+          setIsSpeaking(false);
+          if (onSpeechStateChange) onSpeechStateChange(false);
+          premiumAudioSourceRef.current = null;
+        };
+
+        source.start(0);
+        setIsSpeaking(true);
+        if (onSpeechStateChange) onSpeechStateChange(true);
+      } catch (err: any) {
+        console.error("Gemini Premium TTS Playback error:", err);
+        alert(err.message || "Unable to play premium AI narrative. Falling back to browser speech.");
+        // Fallback to webspeech if gemini fails
+        setTtsEngine("webspeech");
+      } finally {
+        setIsTtsLoading(false);
+      }
+    } else {
+      // 2. ROBUST BROWSER WEB SPEECH API FLOW
+      if (typeof window === "undefined" || !window.speechSynthesis) return;
+
+      // Deep markdown cleanup to ensure beautiful, fluid reading without visual characters
+      const cleanText = text
+        .replace(/[#*`~_\-]/g, " ") // Replace markdown syntax with slight pauses (spaces)
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1") // Extract text from links, scrap URLs
+        .replace(/✔|✅/g, " Yes. ")
+        .replace(/⚠️|❌/g, " Warning. ")
+        .replace(/💡/g, " Key Tip. ")
+        .replace(/\|/g, " ") // Clean up tables
+        .replace(/&nbsp;/g, " ")
+        .replace(/\s+/g, " ") // Collapse whitespace
+        .trim();
+
+      // 1. Clear any active listeners on previous utterance to prevent stale state updates
+      if (utteranceRef.current) {
+        utteranceRef.current.onend = null;
+        utteranceRef.current.onerror = null;
+      }
+
+      // 2. Clear browser speech queue
+      window.speechSynthesis.cancel();
+
+      // 3. A brief timeout of 80ms allows the browser audio thread to process the cancellation
+      // and successfully accept the new speak command without immediate cancellation.
+      setTimeout(() => {
+        if (!text) return;
+
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        
+        if (selectedVoice) {
+          utterance.voice = selectedVoice;
+        } else {
+          const voices = window.speechSynthesis.getVoices();
+          let optimalVoice = voices.find(v => v.lang.replace("_", "-").toLowerCase() === "hi-in" || v.lang.toLowerCase().startsWith("hi") || v.name.toLowerCase().includes("hindi") || v.name.toLowerCase().includes("india"));
+          if (!optimalVoice) {
+            optimalVoice = voices.find(v => v.name.toLowerCase().includes("aura"));
+          }
+          if (!optimalVoice) {
+            if (language === "hinglish") {
+              optimalVoice = voices.find(v => (v.lang.includes("IN") && v.lang.startsWith("en")) || v.lang.startsWith("hi"));
+            }
+            if (!optimalVoice) {
+              optimalVoice = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Male") || v.name.includes("India")));
+            }
+          }
+          if (optimalVoice) {
+            utterance.voice = optimalVoice;
+          }
+        }
+        
+        utterance.rate = speechRate;
+        utterance.pitch = speechPitch;
+
+        const handleSpeechEnd = () => {
+          setIsSpeaking(false);
+          if (onSpeechStateChange) onSpeechStateChange(false);
+          utteranceRef.current = null;
+        };
+
+        utterance.onend = handleSpeechEnd;
+
+        utterance.onerror = (e) => {
+          // 'interrupted' is normal when a new speech is triggered or cancelled manually
+          if (e.error !== 'interrupted' && utteranceRef.current === utterance) {
+            console.warn("Speech Synthesis finished or stopped:", e);
+            setIsSpeaking(false);
+            if (onSpeechStateChange) onSpeechStateChange(false);
+            utteranceRef.current = null;
+          }
+        };
+
+        // Keep a reference to prevent garbage collection on Chrome/Safari
+        utteranceRef.current = utterance;
+        (window as any)._activeUtterance = utterance;
+
+        // In case the browser TTS got stuck in paused state, force resume first
+        if (window.speechSynthesis.paused) {
+          window.speechSynthesis.resume();
+        }
+
+        window.speechSynthesis.speak(utterance);
+        setIsSpeaking(true);
+        if (onSpeechStateChange) onSpeechStateChange(true);
+      }, 80);
     }
-    
-    if (!optimalVoice) {
-      optimalVoice = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Male")));
-    }
-
-    if (optimalVoice) {
-      utterance.voice = optimalVoice;
-    }
-    
-    utterance.rate = 1.05; // Slightly faster for efficiency
-    utterance.pitch = 0.95; // Slightly lower pitch for Mr. Kilvish's deep authority
-
-    utterance.onend = () => {
-      setIsSpeaking(false);
-      if (onSpeechStateChange) onSpeechStateChange(false);
-    };
-
-    utterance.onerror = () => {
-      setIsSpeaking(false);
-      if (onSpeechStateChange) onSpeechStateChange(false);
-    };
-
-    setSpeechUtterance(utterance);
-    window.speechSynthesis.speak(utterance);
-    setIsSpeaking(true);
-    if (onSpeechStateChange) onSpeechStateChange(true);
   };
 
   // Render when loading
@@ -1010,17 +1572,17 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
   // Render when empty state
   if (!text) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 min-h-[350px] bg-white rounded-2xl border border-slate-200 text-center relative shadow-sm">
-        <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 mb-4">
-          <Shield className="w-7 h-7" />
+      <div className="flex flex-col items-center justify-center p-6 min-h-[260px] bg-white rounded-xl border border-slate-200 text-center relative shadow-sm">
+        <div className="w-11 h-11 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-slate-400 mb-3">
+          <Shield className="w-5.5 h-5.5" />
         </div>
-        <h3 className="font-display font-bold text-slate-900 text-base">
+        <h3 className="font-display font-bold text-slate-900 text-sm">
           Readability Output
         </h3>
-        <p className="text-slate-500 text-xs mt-2 max-w-sm leading-relaxed">
+        <p className="text-slate-500 text-[11px] mt-1.5 max-w-sm leading-relaxed">
           Provide complex legal text, academic papers, messy notes, or medical records on the left panel, then trigger simplification.
         </p>
-        <div className="mt-4 px-3 py-1.5 rounded bg-slate-50 border border-slate-200 text-[10px] font-mono text-slate-600 font-semibold uppercase tracking-widest">
+        <div className="mt-3.5 px-2.5 py-1 rounded bg-slate-50 border border-slate-200 text-[9px] font-mono text-slate-600 font-bold uppercase tracking-widest">
           STANDBY: Awaiting Jargon Stream
         </div>
       </div>
@@ -1030,15 +1592,26 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
   return (
     <div className="flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
       {/* Control Actions Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:px-8 sm:py-5 border-b border-slate-200 bg-slate-50">
-        <div className="flex items-center gap-2.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse" />
-          <span className="text-xs sm:text-sm font-mono text-slate-600 uppercase tracking-widest font-bold">
-            Simplified Output
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 sm:px-4.5 sm:py-3 border-b border-slate-200 bg-slate-50">
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full transition-all duration-300 ${isTyping ? "bg-amber-500 animate-ping" : "bg-blue-600 animate-pulse"}`} />
+          <span className="text-[11px] sm:text-xs font-mono text-slate-600 uppercase tracking-widest font-bold">
+            {isTyping ? "Typing..." : "Simplified Output"}
           </span>
+          {isTyping && (
+            <button
+              type="button"
+              onClick={skipTypewriter}
+              className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-50 hover:bg-indigo-100 border border-indigo-100 text-indigo-600 font-mono font-bold uppercase transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+              title="Skip typewriter animation and display full simplified text instantly"
+            >
+              <Zap className="w-2.5 h-2.5 animate-pulse text-indigo-600" />
+              <span>Skip</span>
+            </button>
+          )}
         </div>
 
-        <div className="flex items-center gap-1.5 sm:gap-3 overflow-x-auto no-scrollbar max-w-full py-0.5">
+        <div className="flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto no-scrollbar max-w-full py-0.5">
           {/* Permanent Course Page link button */}
           {currentCourseId && (
             <button
@@ -1047,10 +1620,10 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
                 window.history.pushState({}, "", `/course/${currentCourseId}`);
                 window.dispatchEvent(new PopStateEvent("popstate"));
               }}
-              className="p-2 px-3.5 py-2 sm:p-2.5 sm:px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-mono font-bold text-[10px] sm:text-xs uppercase flex items-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0"
+              className="p-1.5 px-3 py-1.5 sm:p-2 sm:px-3.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-mono font-bold text-[9px] sm:text-[10px] uppercase flex items-center gap-1 transition-all shadow-sm cursor-pointer shrink-0"
               title="Open the beautiful permanent online courseware page!"
             >
-              <BookOpen className="w-3.5 h-3.5 text-white" />
+              <BookOpen className="w-3 h-3 text-white" />
               <span>OPEN COURSE PAGE</span>
             </button>
           )}
@@ -1060,7 +1633,7 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
             type="button"
             onClick={handleSpeech}
             disabled={verificationStatus !== "success"}
-            className={`p-2 px-2.5 sm:p-2.5 sm:px-3.5 rounded-xl border text-[10px] sm:text-xs font-mono font-bold flex items-center gap-1 sm:gap-2 transition-all duration-300 shrink-0 ${
+            className={`p-1.5 px-2 sm:p-2 sm:px-3 rounded-lg border text-[9px] sm:text-[10px] font-mono font-bold flex items-center gap-1 sm:gap-1.5 transition-all duration-300 shrink-0 ${
               verificationStatus !== "success"
                 ? "bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed opacity-60"
                 : isSpeaking
@@ -1087,7 +1660,7 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
             type="button"
             onClick={handleCopy}
             disabled={verificationStatus !== "success"}
-            className={`p-2 sm:p-2.5 rounded-xl bg-white border text-slate-500 transition-all duration-300 flex items-center justify-center min-w-[36px] min-h-[36px] sm:min-w-[40px] sm:min-h-[40px] shrink-0 ${
+            className={`p-1.5 sm:p-2 rounded-lg bg-white border text-slate-500 transition-all duration-300 flex items-center justify-center min-w-[30px] min-h-[30px] sm:min-w-[34px] sm:min-h-[34px] shrink-0 ${
               verificationStatus !== "success"
                 ? "border-slate-200 text-slate-300 bg-slate-50 cursor-not-allowed opacity-60"
                 : "border-slate-200 hover:text-slate-800 hover:border-slate-300 cursor-pointer"
@@ -1095,9 +1668,9 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
             title={verificationStatus !== "success" ? "Verify code to copy" : "Copy to Clipboard"}
           >
             {copied ? (
-              <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
+              <Check className="w-3.5 h-3.5 text-emerald-600" />
             ) : (
-              <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <Copy className="w-3.5 h-3.5" />
             )}
           </button>
 
@@ -1106,14 +1679,14 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
             type="button"
             onClick={handleDownload}
             disabled={verificationStatus !== "success"}
-            className={`p-2 px-2.5 sm:p-2.5 rounded-xl bg-white border transition-all duration-300 flex items-center gap-1 sm:gap-1.5 shrink-0 ${
+            className={`p-1.5 px-2 sm:p-2 rounded-lg bg-white border transition-all duration-300 flex items-center gap-1 shrink-0 ${
               verificationStatus !== "success"
                 ? "border-slate-200 text-slate-300 bg-slate-50 cursor-not-allowed opacity-60"
                 : "border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300 cursor-pointer"
             }`}
             title={verificationStatus !== "success" ? "Verify code to download" : "Download as Markdown (.md)"}
           >
-            <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <Download className="w-3.5 h-3.5" />
             <span className={`text-[9px] sm:text-[10px] font-mono font-bold px-0.5 ${verificationStatus !== "success" ? "text-slate-300" : "text-slate-600"}`}>MD</span>
           </button>
 
@@ -1122,15 +1695,31 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
             type="button"
             onClick={handleDownloadHTML}
             disabled={verificationStatus !== "success"}
-            className={`p-2 px-2.5 sm:p-2.5 rounded-xl bg-white border transition-all duration-300 flex items-center gap-1 sm:gap-1.5 shrink-0 ${
+            className={`p-1.5 px-2 sm:p-2 rounded-lg bg-white border transition-all duration-300 flex items-center gap-1 shrink-0 ${
               verificationStatus !== "success"
                 ? "border-slate-200 text-slate-300 bg-slate-50 cursor-not-allowed opacity-60"
                 : "border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300 cursor-pointer"
             }`}
             title={verificationStatus !== "success" ? "Verify code to download" : "Save & Download as Branded HTML (.html)"}
           >
-            <FileCode className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${verificationStatus !== "success" ? "text-slate-300" : "text-emerald-600"}`} />
+            <FileCode className={`w-3.5 h-3.5 ${verificationStatus !== "success" ? "text-slate-300" : "text-emerald-600"}`} />
             <span className={`text-[9px] sm:text-[10px] font-mono font-bold px-0.5 ${verificationStatus !== "success" ? "text-slate-300" : "text-emerald-600"}`}>HTML</span>
+          </button>
+
+          {/* Download PDF Button */}
+          <button
+            type="button"
+            onClick={handleExportPDF}
+            disabled={verificationStatus !== "success"}
+            className={`p-1.5 px-2 sm:p-2 rounded-lg bg-white border transition-all duration-300 flex items-center gap-1 shrink-0 ${
+              verificationStatus !== "success"
+                ? "border-slate-200 text-slate-300 bg-slate-50 cursor-not-allowed opacity-60"
+                : "border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300 cursor-pointer"
+            }`}
+            title={verificationStatus !== "success" ? "Verify code to download PDF" : "Download as formatted PDF (.pdf)"}
+          >
+            <FileText className={`w-3.5 h-3.5 ${verificationStatus !== "success" ? "text-slate-300" : "text-rose-600"}`} />
+            <span className={`text-[9px] sm:text-[10px] font-mono font-bold px-0.5 ${verificationStatus !== "success" ? "text-slate-300" : "text-rose-600"}`}>PDF</span>
           </button>
 
           {/* Print Branded Document Button */}
@@ -1138,28 +1727,28 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
             type="button"
             onClick={handlePrint}
             disabled={verificationStatus !== "success"}
-            className={`p-2 px-2.5 sm:p-2.5 rounded-xl bg-white border transition-all duration-300 flex items-center gap-1 sm:gap-1.5 shrink-0 ${
+            className={`p-1.5 px-2 sm:p-2 rounded-lg bg-white border transition-all duration-300 flex items-center gap-1 shrink-0 ${
               verificationStatus !== "success"
                 ? "border-slate-200 text-slate-300 bg-slate-50 cursor-not-allowed opacity-60"
                 : "border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300 cursor-pointer"
             }`}
             title={verificationStatus !== "success" ? "Verify code to print" : "Print Document with Branding"}
           >
-            <Printer className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${verificationStatus !== "success" ? "text-slate-300" : "text-blue-600"}`} />
+            <Printer className={`w-3.5 h-3.5 ${verificationStatus !== "success" ? "text-slate-300" : "text-blue-600"}`} />
             <span className={`text-[9px] sm:text-[10px] font-mono font-bold px-0.5 ${verificationStatus !== "success" ? "text-slate-300" : "text-blue-600"}`}>PRINT</span>
           </button>
         </div>
       </div>
 
       {/* Styled Output Render Container */}
-      <div className="p-6 sm:p-10 overflow-y-auto max-h-[650px] leading-relaxed font-sans text-slate-800 select-text bg-white">
+      <div className="p-3 sm:p-4 md:p-4.5 overflow-y-auto max-h-[650px] leading-relaxed font-sans text-slate-800 select-text bg-white">
         {verificationStatus !== "success" ? (
-          <div className="flex flex-col items-center justify-center py-10 px-4 sm:px-8 min-h-[440px] bg-slate-50 border border-slate-100 rounded-2xl shadow-inner max-w-xl mx-auto my-4 animate-[fadeIn_0.4s_ease-out]">
-            <div className="w-14 h-14 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-white mb-5 shadow-sm">
-              <Lock className="w-6 h-6 text-indigo-400" />
+          <div className="flex flex-col items-center justify-center py-6 px-4 sm:px-6 min-h-[300px] bg-slate-50 border border-slate-100 rounded-xl shadow-inner max-w-xl mx-auto my-2 animate-[fadeIn_0.4s_ease-out]">
+            <div className="w-11 h-11 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-white mb-3.5 shadow-sm">
+              <Lock className="w-5.5 h-5.5 text-indigo-400" />
             </div>
             
-            <h3 className="font-display font-extrabold text-slate-950 text-lg sm:text-xl tracking-tight text-center">
+            <h3 className="font-display font-extrabold text-slate-950 text-base sm:text-lg tracking-tight text-center">
               {language === "hi" ? "कोड दर्ज करें और पढ़ें" : "Enter Code and Read"}
             </h3>
             
@@ -1225,21 +1814,21 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
         ) : (
           <>
             {/* On-screen Letterhead Branding */}
-            <div className="mb-8 p-6 bg-slate-50/80 rounded-2xl border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <AcademyLogo className="w-12 h-12 text-slate-900" />
+            <div className="mb-4 p-4 bg-slate-50/80 rounded-xl border border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <AcademyLogo className="w-9 h-9 text-slate-900" />
             <div>
-              <div className="text-lg font-extrabold text-slate-900 tracking-tight font-sans leading-none">MR. KILVISH ACADEMY</div>
-              <div className="text-xs italic text-slate-500 font-serif mt-1">"Clarity is Power"</div>
-              <div className="flex flex-wrap items-center gap-2 mt-2.5 text-[10px] font-mono text-slate-500 font-bold uppercase">
-                <span className="bg-slate-200/60 px-1.5 py-0.5 rounded text-slate-600">Code: MKA-001</span>
-                <span className="bg-slate-200/60 px-1.5 py-0.5 rounded text-slate-600">ID: BK-001</span>
-                <span className="bg-slate-200/60 px-1.5 py-0.5 rounded text-slate-600">Ver: v1.0</span>
+              <div className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight font-sans leading-none">MR. KILVISH ACADEMY</div>
+              <div className="text-[11px] italic text-slate-500 font-serif mt-0.5">"Clarity is Power"</div>
+              <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[9px] font-mono text-slate-500 font-bold uppercase">
+                <span className="bg-slate-200/60 px-1 py-0.2 rounded text-slate-600">Code: MKA-001</span>
+                <span className="bg-slate-200/60 px-1 py-0.2 rounded text-slate-600">ID: BK-001</span>
+                <span className="bg-slate-200/60 px-1 py-0.2 rounded text-slate-600">Ver: v1.0</span>
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 border-t md:border-t-0 md:border-l border-slate-200/80 pt-4 md:pt-0 md:pl-6 shrink-0">
+          <div className="flex items-center gap-4 border-t md:border-t-0 md:border-l border-slate-200/80 pt-3 md:pt-0 md:pl-5 shrink-0">
             {/* Live QR Code Preview */}
             <div className="flex flex-col items-center">
               <QRCodeSVG />
@@ -1257,34 +1846,34 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
         </div>
 
         {/* Sovereign Student progress dashboard */}
-        <div className="mb-8 p-6 bg-gradient-to-br from-slate-900 to-indigo-950 text-white rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden">
+        <div className="mb-4 p-4.5 bg-gradient-to-br from-slate-900 to-indigo-950 text-white rounded-xl border border-slate-800 shadow-lg relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl" />
           <div className="absolute -bottom-8 -left-8 w-40 h-40 bg-blue-500/5 rounded-full blur-3xl" />
           
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center shadow-inner">
-                <Trophy className="w-7 h-7 text-indigo-400 animate-bounce" />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center shadow-inner shrink-0">
+                <Trophy className="w-5.5 h-5.5 text-indigo-400 animate-bounce" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20">
+                  <span className="text-[9px] font-mono font-bold text-indigo-400 uppercase tracking-widest bg-indigo-500/10 px-1.5 py-0.2 rounded-full border border-indigo-500/20">
                     Student Level
                   </span>
-                  <span className="text-xs font-mono font-bold text-slate-300">
+                  <span className="text-[11px] font-mono font-bold text-slate-300">
                     {completedChapters.length === chaptersCount ? "🏆 Academic Master" : "📚 Academy Scholar"}
                   </span>
                 </div>
-                <h3 className="text-xl font-extrabold font-sans text-white tracking-tight mt-1">
+                <h3 className="text-base font-extrabold font-sans text-white tracking-tight mt-0.5">
                   Level {Math.floor(userXp / 300) + 1} Clarity Explorer
                 </h3>
-                <p className="text-slate-400 text-xs mt-1">
-                  Banish darkness to earn XP. You have completed <span className="text-indigo-300 font-bold font-mono">{completedChapters.length}</span> of <span className="text-slate-300 font-bold font-mono">{chaptersCount}</span> syllabus modules.
+                <p className="text-slate-400 text-[11px] mt-0.5 leading-snug">
+                  Banish darkness to earn XP. Completed <span className="text-indigo-300 font-bold font-mono">{completedChapters.length}</span> of <span className="text-slate-300 font-bold font-mono">{chaptersCount}</span> syllabus modules.
                 </p>
               </div>
             </div>
 
-            <div className="flex flex-col w-full md:w-56 shrink-0 border-t md:border-t-0 md:border-l border-slate-800 pt-4 md:pt-0 md:pl-6">
+            <div className="flex flex-col w-full md:w-56 shrink-0 border-t md:border-t-0 md:border-l border-slate-800 pt-3 md:pt-0 md:pl-5">
               <div className="flex items-center justify-between text-xs font-mono font-bold uppercase text-slate-300">
                 <span>XP Points</span>
                 <span className="text-indigo-400">{userXp} XP</span>
@@ -1301,6 +1890,204 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Sovereign Audio Companion - Narrator on the Go */}
+        <div className="mb-5 p-5 bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl border border-slate-800 shadow-xl relative overflow-hidden text-white transition-all duration-300">
+          {/* Subtle background glow when active */}
+          {isSpeaking && (
+            <div className="absolute -right-20 -top-20 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl animate-pulse pointer-events-none" />
+          )}
+          
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
+            
+            {/* Left Side: Avatar, Speaker Info, & Accent Badge */}
+            <div className="flex items-center gap-4 flex-1 min-w-0 text-center md:text-left flex-col md:flex-row">
+              {/* Dynamic Interactive Speaker Button */}
+              <button
+                type="button"
+                onClick={handleSpeech}
+                disabled={isTtsLoading}
+                className={`w-16 h-16 rounded-full flex items-center justify-center transition-all duration-300 relative cursor-pointer active:scale-95 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 ${
+                  isSpeaking
+                    ? "bg-rose-500 text-white shadow-lg shadow-rose-500/30 ring-4 ring-rose-500/20"
+                    : "bg-indigo-600 text-white hover:bg-indigo-500 shadow-lg shadow-indigo-600/30 ring-4 ring-indigo-600/10"
+                } ${isTtsLoading ? "opacity-75 cursor-not-allowed" : ""}`}
+                title={isSpeaking ? "Stop Narration" : "Start Narration"}
+              >
+                {/* Glowing ripple effect when speaking */}
+                {isSpeaking && (
+                  <>
+                    <span className="absolute inset-0 rounded-full bg-rose-500 animate-ping opacity-25" />
+                    <span className="absolute -inset-2 rounded-full bg-rose-500/10 animate-pulse" />
+                  </>
+                )}
+                
+                {isTtsLoading ? (
+                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : isSpeaking ? (
+                  <Pause className="w-7 h-7 text-white fill-white" />
+                ) : (
+                  <Play className="w-7 h-7 text-white fill-white translate-x-0.5" />
+                )}
+              </button>
+
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center justify-center md:justify-start gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-amber-400" />
+                    {ttsEngine === "gemini" ? "Gemini Premium AI" : "Browser Web Speech"}
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-sans font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1.5">
+                    <span className={`w-1.5 h-1.5 rounded-full ${isSpeaking ? "bg-rose-400 animate-ping" : "bg-emerald-400"}`} />
+                    {isTtsLoading ? "Generating AI Voice..." : isSpeaking ? "Now Speaking" : "Ready"}
+                  </span>
+                </div>
+                
+                <h4 className="text-sm font-bold text-slate-100 mt-1.5 flex items-center gap-1.5 justify-center md:justify-start">
+                  <span>Mr. Kilvish Sovereign Voice Guide</span>
+                  {ttsEngine === "gemini" && <span className="text-[9px] font-mono bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 rounded font-bold uppercase">ULTRA HD</span>}
+                </h4>
+                
+                <p className="text-xs text-slate-400 mt-1 flex items-center justify-center md:justify-start gap-1">
+                  <span>Speaker Accent Language:</span>
+                  <span className="font-semibold text-indigo-300">
+                    {ttsEngine === "gemini" ? "Friendly Hindi India / Bilingual Hinglish" : "Hindi India (hi_IN)"}
+                  </span>
+                </p>
+                <p className="text-[10px] text-slate-500 mt-0.5 italic truncate max-w-[280px] sm:max-w-md">
+                  {ttsEngine === "gemini" 
+                    ? `Premium AI Voice Persona: ${premiumVoice} (Ultra Natural Studio Speaker)`
+                    : (selectedVoice ? `Active Voice: ${selectedVoice.name}` : "Auto-configured browser voice")
+                  }
+                </p>
+              </div>
+            </div>
+
+            {/* Right Side: Waveform Visualizer & Engine Info */}
+            <div className="flex flex-col items-center md:items-end justify-center shrink-0 w-full md:w-auto border-t md:border-t-0 border-slate-800/80 pt-4 md:pt-0">
+              {/* Dynamic Sound Waveform */}
+              <div className="flex items-end gap-1 h-7 px-4 justify-center mb-2">
+                {[...Array(12)].map((_, i) => (
+                  <div 
+                    key={i} 
+                    className={`w-[3px] rounded-full transition-all duration-300 ${
+                      isSpeaking ? "bg-indigo-400" : "bg-slate-700"
+                    }`}
+                    style={{
+                      height: isSpeaking ? `${Math.sin(i * 0.5) * 60 + 80}%` : '20%',
+                      transformOrigin: 'bottom',
+                      animationName: isSpeaking ? 'soundwave' : 'none',
+                      animationDuration: `${0.8 + (i % 3) * 0.2}s`,
+                      animationTimingFunction: 'ease-in-out',
+                      animationIterationCount: 'infinite',
+                      animationDirection: 'alternate',
+                      animationDelay: `${i * 0.08}s`,
+                      minHeight: '4px'
+                    }}
+                  />
+                ))}
+              </div>
+              <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest text-center">
+                {isTtsLoading ? "GENERATING AUDIO NARRATIVE..." : isSpeaking ? "PLAYING AUDIO STREAM" : "TOUCH BUTTON TO LISTEN"}
+              </span>
+            </div>
+
+          </div>
+
+          {/* New Interactive Control & Custom Configurator Rail inside card */}
+          <div className="mt-4 pt-4 border-t border-slate-800/80 flex flex-col md:flex-row gap-4 justify-between items-center text-xs text-slate-300">
+            {/* Engine Select Pill */}
+            <div className="flex flex-col gap-1 w-full md:w-auto">
+              <span className="text-[10px] font-mono text-slate-500 uppercase font-bold tracking-wider mb-1">Speaker Mode Engine</span>
+              <div className="inline-flex rounded-xl bg-slate-950 p-1 border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    // stop current speaking if switching
+                    if (isSpeaking) handleSpeech();
+                    setTtsEngine("gemini");
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+                    ttsEngine === "gemini" 
+                      ? "bg-indigo-600 text-white shadow-md font-bold" 
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <Cpu className="w-3.5 h-3.5" />
+                  Premium AI Voice
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isSpeaking) handleSpeech();
+                    setTtsEngine("webspeech");
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-300 flex items-center gap-1.5 cursor-pointer ${
+                    ttsEngine === "webspeech" 
+                      ? "bg-indigo-600 text-white shadow-md font-bold" 
+                      : "text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <Volume2 className="w-3.5 h-3.5" />
+                  Web Speech API
+                </button>
+              </div>
+            </div>
+
+            {/* Dynamic Voice configuration section */}
+            <div className="flex flex-col gap-1 w-full md:w-auto flex-1 md:pl-6">
+              {ttsEngine === "gemini" ? (
+                <>
+                  <span className="text-[10px] font-mono text-slate-500 uppercase font-bold tracking-wider mb-1">AI Narrator Style (Studio Speaker)</span>
+                  <div className="grid grid-cols-5 gap-1.5 max-w-md bg-slate-950 p-1 rounded-xl border border-slate-800">
+                    {(["Zephyr", "Kore", "Puck", "Charon", "Fenrir"] as const).map((voice) => (
+                      <button
+                        key={voice}
+                        type="button"
+                        onClick={() => {
+                          if (isSpeaking) handleSpeech();
+                          setPremiumVoice(voice);
+                        }}
+                        className={`py-1.5 rounded-lg text-[10px] font-mono font-bold text-center transition-all cursor-pointer ${
+                          premiumVoice === voice
+                            ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30"
+                            : "text-slate-400 hover:text-slate-200 hover:bg-slate-900"
+                        }`}
+                      >
+                        {voice}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="text-[10px] font-mono text-slate-500 uppercase font-bold tracking-wider mb-1">Web Speech Narrator Speed</span>
+                  <div className="flex items-center gap-3 bg-slate-950 p-1.5 px-3 rounded-xl border border-slate-800">
+                    <Sliders className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    <div className="flex gap-2 w-full justify-between">
+                      {([0.8, 1.0, 1.2, 1.5] as const).map((rate) => (
+                        <button
+                          key={rate}
+                          type="button"
+                          onClick={() => setSpeechRate(rate)}
+                          className={`px-2.5 py-1 rounded text-[10px] font-bold font-mono transition-all cursor-pointer ${
+                            speechRate === rate
+                              ? "bg-indigo-600 text-white"
+                              : "text-slate-400 hover:text-slate-200"
+                          }`}
+                        >
+                          {rate}x
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+          </div>
+
         </div>
 
         <div className="markdown-body space-y-7 text-[15px] leading-loose font-sans">
@@ -1484,7 +2271,7 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
               }
             }}
           >
-            {healHindiOCR(text)}
+            {healHindiOCR(isTyping ? displayedText + " ▮" : displayedText)}
           </Markdown>
         </div>
 
@@ -1618,6 +2405,50 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          {/* 5-Star Quality Rating System */}
+          <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-8 animate-[fadeIn_0.4s_ease-out]">
+            <div className="flex-1">
+              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                <Star className={`w-4 h-4 ${rating ? 'text-amber-500 fill-amber-500' : 'text-slate-400'}`} />
+                Rate Explanation Quality
+              </h4>
+              <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                How helpful was Mr. Kilvish's simplified breakdown? Rate it to save this rating metadata to your local clarity log history.
+              </p>
+            </div>
+            
+            <div className="flex flex-col items-start sm:items-end gap-1.5 shrink-0">
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => onRate && onRate(star)}
+                    className="p-1 rounded-lg hover:bg-slate-200/80 transition-colors cursor-pointer group active:scale-95"
+                    title={`Rate ${star} star${star > 1 ? 's' : ''}`}
+                  >
+                    <Star 
+                      className={`w-5.5 h-5.5 transition-all duration-150 ${
+                        star <= (rating || 0)
+                          ? "text-amber-500 fill-amber-500 scale-110"
+                          : "text-slate-300 hover:text-amber-400"
+                      } group-hover:scale-110`}
+                    />
+                  </button>
+                ))}
+              </div>
+              {rating ? (
+                <span className="text-[10px] font-mono font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 animate-[fadeIn_0.3s_ease-out]">
+                  Thanks! Rated {rating}/5 Stars
+                </span>
+              ) : (
+                <span className="text-[9px] font-mono font-semibold text-slate-400 uppercase">
+                  Awaiting your rating
+                </span>
+              )}
             </div>
           </div>
 
