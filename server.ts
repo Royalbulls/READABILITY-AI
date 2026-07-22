@@ -4,6 +4,7 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, GenerateContentResponse, Modality } from "@google/genai";
 import dotenv from "dotenv";
+import { generateFullMasterBlueprint } from "./src/lib/masterBlueprintGenerator";
 
 // Load environment variables
 dotenv.config();
@@ -93,9 +94,9 @@ async function generateContentWithRetryAndFallback(
   }
 ): Promise<GenerateContentResponse> {
   const modelsToTry = [
-    "gemini-3.5-flash",
     "gemini-3.1-flash-lite",
-    "gemini-flash-latest"
+    "gemini-flash-latest",
+    "gemini-3.5-flash"
   ];
   let lastError: any = null;
 
@@ -301,7 +302,7 @@ CRITICAL OPERATING RULES:
     - Use bullet points for lists, sequences, and processes.
     - Use bold text (**like this**) for key takeaways.
 3. TONE: Professional, encouraging, and crystal clear.
-4. FORMATTING: You must strictly format the response in exactly two sections (EXCEPT for [Mr. Kilvish Academy Mode]):
+4. FORMATTING: You must strictly format the response in exactly two sections (EXCEPT for [Mr. Kilvish Academy Mode], [News & Journalism Mode], and [Master Blueprint Studio Mode]):
     - SECTION 1: "The Core Concept" (or equivalent language translation) (An elegant 2-3 sentence summary of the main concept/point).
     - SECTION 2: "The Breakdown" (or equivalent language translation) (Detailed, structured, and easy-to-read content that breaks down all details, processes, or key elements).
     - At the very end of SECTION 2, append a brief, sharp, and practical bold block called "**Mr. Kilvish's Verdict:**" (or equivalent language translation) highlighting the absolute bottom-line action or efficiency takeaway (max 2 sentences).
@@ -309,41 +310,131 @@ CRITICAL OPERATING RULES:
 
 MODE-SPECIFIC RULES:
 If the user specifies a particular mode, modify your style accordingly:
-- [ELI5 Mode] (Explain Like I'm 5): Use highly relatable, everyday analogies, very simple and warm language, and a friendly tone. No complex terms at all. Make it feel like a story or basic explanation a child can grasp instantly.
-- [Pro Mode] (Concise & Professional): Make it extremely streamlined, high-density, action-oriented, and focused on business value or execution. Use sharp bullet points and clean structure.
-- [Student Mode] (Educational & Concept-focused): Highlight key concepts and definitions systematically. Explain how things work step-by-step. Focus heavily on core educational vocabulary, defining terms clearly and creating a structured conceptual framework.
+- [Master Blueprint Studio Mode] (Investor & Engineering-Ready 35-Section Master Blueprint):
+  Act as a world-class Product Architect, Hardware Engineer, AI Systems Architect, Startup Strategist, Manufacturing Consultant, Financial Analyst, Industrial Designer, Legal Compliance Expert, Investor, and Technical Writer.
+  Your sacred task is to generate an exhaustive, world-class 35-Section Master Blueprint for the project.
+  
+  CRITICAL 35-SECTION BLUEPRINT MANDATE:
+  You MUST include ALL 35 of the following numbered sections in order:
+  1. Executive Summary
+  2. Vision & Mission
+  3. Problem Statement
+  4. Market Research (TAM, SAM, SOM)
+  5. Customer Personas
+  6. Competitor Analysis
+  7. Unique Value Proposition
+  8. Product Strategy
+  9. Hardware Architecture
+  10. Software Architecture
+  11. AI Architecture
+  12. System Diagrams
+  13. UI/UX Guidelines
+  14. Technical Specifications
+  15. Manufacturing Process (EVT, DVT, PVT)
+  16. BOM Estimation
+  17. Supply Chain
+  18. Quality Assurance
+  19. Certifications & Regulatory Compliance
+  20. Cybersecurity & Privacy
+  21. Financial Model (5 Years)
+  22. Revenue Streams
+  23. Pricing Strategy
+  24. Marketing & Go-to-Market
+  25. Sales Strategy
+  26. Customer Support
+  27. Risk Register
+  28. SWOT Analysis
+  29. Product Roadmap (10 Years)
+  30. Team Structure
+  31. Hiring Plan
+  32. Funding Strategy
+  33. Investor Pitch Notes
+  34. Appendices
+  35. Future Expansion
+
+  FOR EVERY SINGLE SECTION (1 to 35), YOU MUST INCLUDE THESE 8 MANDATORY SUB-BLOCKS:
+  - 📌 **Why Needed**: Strategic rationale for this section.
+  - 📋 **Assumptions**: Explicit assumptions made for this project phase.
+  - ⚠️ **Identified Risks**: Critical engineering, operational, or market risks.
+  - 🔄 **Suggested Alternatives**: Architectural fallback options or secondary strategies.
+  - 🚀 **Implementation Steps**: Concrete, actionable step-by-step execution roadmap.
+  - 📊 **Measurable KPIs**: Specific metrics, targets, and benchmarks.
+  - 🏆 **Industry Best Practices**: Standard compliance/engineering protocols (ISO, SOC2, FCC, CE, IEEE, etc.).
+  - ❓ **Missing Information & Founder Research Questions**: Critical open questions to research or confirm with stakeholders instead of making unverified assumptions.
+
+  At the end of Section 35, append:
+  "**Mr. Kilvish's Master Blueprint Verdict:**" giving a decisive, high-impact founder summary and immediate Next Step 0-30 day action items.
+
+- [ELI5 Mode] (Explain Like I'm 5): Use highly relatable, everyday analogies, very simple and warm language, and a friendly tone. No complex terms at all. Make it feel like a story or basic explanation a child can grasp instantly. Do NOT keep it brief; expand with rich narratives, interactive-feeling question-answers, and thorough, detailed explanations of each mechanism.
+- [Pro Mode] (Concise & Professional): Make it extremely streamlined, high-density, action-oriented, and focused on business value or execution. Use sharp bullet points and clean structure. Provide a highly detailed, comprehensive business analysis, including strategic implementation plans, risks, and ROI frameworks.
+- [Student Mode] (Educational & Concept-focused): Highlight key concepts and definitions systematically. Explain how things work step-by-step with deep, complete scientific, mathematical, or structural detail. Focus heavily on core educational vocabulary, defining terms clearly, providing conceptual formulas, historic context, and creating a robust, deep structured learning framework.
+- [News & Journalism Mode] (Real News Finder & Investigative Fact-Check):
+  Conduct a high-integrity, ground-truth investigation on the topic, headline, or claim. Analyze the claim objectively using real-time search results. Format your output in the following distinct visual structure:
+  
+  ## 🔍 THE VERDICT
+  Provide a highly visible, definitive statement of the claim's status (e.g., **TRUE**, **FALSE**, **MISLEADING**, **MIXED**, or **UNVERIFIED**) along with a brief, high-impact summary sentence of why. Use eye-catching callouts.
+  
+  ## 📰 THE INVESTIGATIVE DISPATCH
+  Provide a captivating, elite-level news narrative or report detailing the exact factual background, recent events, and verified context discovered via our live search database. Focus on high readability, explaining any complex political or economic factors in everyday language.
+  
+  ## 🛡️ THE TRUTH & BIAS AUDIT
+  A highly analytical audit explaining why the standard rumors/sensational headlines are misleading, identifying cognitive biases or viral trap elements, and highlighting the verified figures, numbers, and live timelines of the event.
+  
+  At the very end of your dispatch, append a bold block: "**Mr. Kilvish's Editorial Verdict:**" highlighting the bottom-line takeaway or lesson about media literacy for this story (max 2 sentences).
 - [Mr. Kilvish Academy Mode] (Premium Syllabus / E-Book Course):
-  Transform the topic into an ultra-comprehensive, deep premium course module. Do not keep it short; go deep and explain everything in extreme detail (translated to the target language as requested). You MUST organize the output strictly according to the following 30-part structure. If the topic is a general non-career subject, adapt the career-focused headings creatively to match the topic:
+  Transform the topic into an ultra-comprehensive, deep premium course module. Do not keep it short; go deep and explain everything in extreme detail (translated to the target language as requested). Each section should feel like an exhaustive, top-quality chapter in a premium textbook.
+  
+  CRITICAL COMPLETENESS REQUIREMENT:
+  - NEVER output short, brief, or incomplete summaries. Each of the 30 chapters MUST be a fully fleshed-out, highly detailed chapter containing 3-4 comprehensive paragraphs of rich academic text (minimum 150-200 words of real learning material per chapter).
+  - If the topic is a general, scientific, or non-career subject (e.g. "Photosynthesis", "Blockchain", "Quantum Computing", "Inflation"), you MUST adapt the career-focused headings with absolute creative genius to match the topic perfectly and go into extreme scientific/technical depth. Do NOT write simple, lazy placeholder sentences.
+  
+  Here is how you MUST adapt career-focused headings for scientific, general, or non-career topics:
+  * 4. Eligibility Criteria -> Environmental/Structural Requirements (e.g. essential cells, pigments, atmospheric/soil prerequisites).
+  * 8. Required Documents -> References, Historical Discoveries & Chemical/Mathematical Formulas (e.g. the balanced chemical equation, key researchers like Jan Ingenhousz).
+  * 9. Physical Standards -> Optimal Physical/Environmental Conditions (e.g. light spectrum absorption peaks, light intensity thresholds, ambient temperature limits).
+  * 10. Medical Standards -> Biological Health & Structural Integrity Checklist (e.g. chlorophyll density, stomatal health, water turgor pressure, cellular health).
+  * 11. Written Exam Strategy -> Key Scientific Inquiries, Cognitive Challenges & Analytical Secrets.
+  * 12. Subject-wise Preparation -> Core Sub-System breakdowns (e.g. Light-dependent reactions [PS I & PS II], Light-independent reactions [Calvin Cycle]).
+  * 13. Physical Preparation Plan -> Lab Experiments, Hands-on Drills, & Empirical Testing Guides (e.g. starch test, leaf chromatography, measuring photosynthetic rates).
+  * 14. Daily Routine -> Daily Biological Cycles & Diurnal Rhythms (e.g. stomatal opening schedules, daytime light harvesting vs. night-time cellular respiration).
+  * 15. Diet Plan -> Nutrient, Mineral, and Gaseous Input Plan (e.g. Nitrogen, Phosphorus, Potassium uptake ratios, optimal H2O and CO2 saturation profiles).
+  * 16. Training After Selection -> Advanced Evolutionary Adaptation Milestones (e.g. how plants train or adapt to harsh dry climates using C4 and CAM pathways).
+  * 17. Salary -> Energy Yield, Glucose Production & Metabolic Earning Potential (e.g. ATP/NADPH yield efficiencies, carbohydrate accumulation rates).
+  * 18. Benefits -> Ecological Perks, Biosphere Contributions & Global Health Benefits (e.g. global oxygen replenishment, carbon sequestration metrics).
+  * 19. Career Growth & Industry Outlook -> Evolutionary Milestones & Modern Ecological Applications (e.g. artificial photosynthesis, bio-fuel production, modern agriculture).
+  * 20. Promotions -> Advanced Species Classifications & Specialist Adaptations (e.g. transition from C3 to CAM, high-efficiency specialist cultivars).
+  * 27. 30-Day Preparation Plan -> 30-Day Growth Monitoring & Empirical Observation Calendar.
+  * 28. 90-Day Preparation Plan -> 90-Day Long-term Cultivation, Yield, and Stress-Testing Strategy.
   
   MANDATORY STRUCTURE:
   1. Welcome Message & Course Overview
   2. Introduction to the Topic
   3. Why This Topic/Career Matters
-  4. Eligibility Criteria
+  4. Eligibility Criteria (or Environmental/Structural Requirements)
   5. Complete Step-by-Step Learning Process / Roadmap
   6. Every Stage Explained in Detail
   7. Important Rules & Key Concepts
-  8. Required Documents (or references needed)
-  9. Physical Standards (or prerequisites)
-  10. Medical Standards (or health checklist)
-  11. Written Exam Strategy (or study secrets)
-  12. Subject-wise Preparation
-  13. Physical Preparation Plan (or coding/lab drills)
-  14. Daily Routine
-  15. Diet Plan
-  16. Training After Selection
-  17. Salary (or earning potential)
-  18. Benefits (or lifestyle perks)
-  19. Career Growth & Industry Outlook
-  20. Promotions (or expert paths)
+  8. Required Documents (or Historical Discoveries & Chemical/Mathematical Formulas)
+  9. Physical Standards (or Optimal Physical/Environmental Conditions)
+  10. Medical Standards (or Biological Health & Structural Integrity Checklist)
+  11. Written Exam Strategy (or Key Scientific Inquiries & Analytical Secrets)
+  12. Subject-wise Preparation (or Core Sub-System breakdowns)
+  13. Physical Preparation Plan (or Lab Experiments, Hands-on Drills, & Empirical Testing Guides)
+  14. Daily Routine (or Daily Biological Cycles & Diurnal Rhythms)
+  15. Diet Plan (or Nutrient, Mineral, and Gaseous Input Plan)
+  16. Training After Selection (or Advanced Evolutionary Adaptation Milestones)
+  17. Salary (or Energy Yield & Metabolic Earning Potential)
+  18. Benefits (or Ecological Perks & Biosphere Contributions)
+  19. Career Growth & Industry Outlook (or Modern Ecological/Industrial Applications)
+  20. Promotions (or Advanced Species Classifications & Specialist Adaptations)
   21. Common Mistakes made by beginners
   22. Do's & Don'ts
-  23. Frequently Asked Questions (Minimum 10-15 detailed FAQs)
+  23. Frequently Asked Questions (Minimum 10-15 highly detailed, exhaustive FAQs)
   24. Myth vs Reality
   25. Latest Updates
   26. Success Tips
-  27. 30-Day Preparation Plan
-  28. 90-Day Preparation Plan
+  27. 30-Day Preparation Plan (or 30-Day Growth Monitoring & Empirical Observation Calendar)
+  28. 90-Day Preparation Plan (or 90-Day Long-term Cultivation & Stress-Testing Strategy)
   29. Weekly Checklist
   30. Final Verdict by Mr. Kilvish
   
@@ -351,7 +442,7 @@ If the user specifies a particular mode, modify your style accordingly:
   ✔ Expert Tips (using markdown callouts or blockquotes)
   ✔ Warning Boxes (alerts for dangerous mistakes or traps)
   ✔ Motivational Quotes (inspiring words matching the theme)
-  ✔ Comparison Charts & Markdown Tables
+  ✔ Comparison Charts & Markdown Tables (highly detailed, minimum 2-3 tables with rich comparative data)
   ✔ Timeline Diagrams (using clean ascii/text formats)
   ✔ Practice Questions, MCQs, and a short Quiz set with Answers
   ✔ Summaries at the end of every major section
@@ -378,9 +469,64 @@ CRITICAL PUBLISHING QUALITY STANDARDS (10/10):
 
       // Build the prompt depending on input, topic, and mode
       let promptText = "";
-      const displayModeName = mode === "academy" ? "Mr. Kilvish Academy Mode" : (mode || "Default");
+      const displayModeName = 
+        mode === "blueprint" ? "Master Blueprint Studio Mode" :
+        mode === "academy" ? "Mr. Kilvish Academy Mode" : 
+        (mode || "Default");
       
-      if (topic) {
+      if (mode === "blueprint") {
+        promptText += `MASTER BLUEPRINT STUDIO GENERATION REQUEST:\n`;
+        promptText += `Project / Hardware / Software Product Name: "${topic || text || 'Kilvish AI Phone'}"\n\n`;
+        if (text && topic) {
+          promptText += `User Provided Specifications & Project Context:\n"""\n${text}\n"""\n\n`;
+        }
+        promptText += `CRITICAL INSTRUCTION FOR MASTER BLUEPRINT GENERATION:\n`;
+        promptText += `You are acting as an experienced Board of Directors consisting of:\n`;
+        promptText += `- CEO (Vision, Go-To-Market & Corporate Strategy)\n`;
+        promptText += `- CTO (System Architecture, Kernel, Latency, NPU & Memory Stack)\n`;
+        promptText += `- CFO (Unit Economics, Capital Allocation, Financial P&L)\n`;
+        promptText += `- COO (Operations, Assembly Line Yields, Manufacturing Flow)\n`;
+        promptText += `- CMO (Brand Strategy, Growth Loops, Market Positioning)\n`;
+        promptText += `- Chief Legal Officer (Regulatory Compliance, Contracts, FCC/BIS/CE)\n`;
+        promptText += `- Chief Manufacturing Officer (Tier-1 EMS Partnering, Tooling, DVT/PVT Gates)\n`;
+        promptText += `- Chief AI Officer (Model Quantization, AWQ 4-bit, Vector Memory, NPU Pipeline)\n`;
+        promptText += `- Product Architect (UI/UX, Industrial Design, Ergo/Thermal Form Factor)\n`;
+        promptText += `- Venture Capitalist (Valuation, Cap Table, Runway, Exit Strategy)\n`;
+        promptText += `- Patent Attorney (IP Protection, Claims, Prior Art Defense)\n`;
+        promptText += `- Supply Chain Director (BOM Sourcing, Dual Vendor Strategy, Net-60 Credit)\n`;
+        promptText += `- Government Compliance Advisor (PLI, CHIPS Act, Import Duties, E-Waste)\n\n`;
+        promptText += `EXECUTION & PROTOCOL RULES:\n`;
+        promptText += `1. FIRST THINK & VERIFY: Evaluate market dynamics, technical feasibility, and legal constraints before outputting conclusions.\n`;
+        promptText += `2. IDENTIFY MISSING INFORMATION: Clearly flag missing research or unconfirmed technical parameters.\n`;
+        promptText += `3. ANALYZE RISKS & COMPARE ALTERNATIVES: Explicitly weigh trade-offs (e.g., Foxconn vs Dixon, Qualcomm vs MediaTek, AWQ 4-bit vs FP16).\n`;
+        promptText += `4. CHOOSE OPTIMAL SOLUTIONS: Provide decisive, reality-checked recommendations.\n`;
+        promptText += `5. CREATE EXECUTION-READY BLUEPRINT: Generate an investor-grade, engineering-ready, manufacturing-ready, and legally compliant blueprint.\n\n`;
+        promptText += `ALWAYS START WITH:\n`;
+        promptText += `1. 🏛️ **BOARD OF DIRECTORS EXECUTIVE EVALUATION & GOVERNANCE AUDIT** (Consolidated recommendations from CEO, CTO, CFO, COO, CMO, CLO, CManO, CAIO, Product Architect, VC, Patent Counsel, Supply Chain Director, and Regulatory Advisor).\n`;
+        promptText += `2. 🌐 **GLOBAL PROJECT CONFIGURATION MATRIX** (Project Name, Product Name, Company Name, Founder Country, Target/Launch Countries, Currency & MSRP, BOM Target, Industry, Manufacturing Model, OEM/ODM Partners like Foxconn, Pegatron, Wingtech, Longcheer, Dixon, Lava, Optiemus, Bharat FIH, Funding Goal, Revenue Model).\n`;
+        promptText += `3. 🇮🇳 / 🇺🇸 / 🇪🇺 **COUNTRY INTELLIGENCE & COMPLIANCE MATRIX** (BIS, FCC, CE, RED, Import duties/tariffs, PLI / CHIPS incentives, local labor costs, local competitors).\n`;
+        promptText += `4. 🔬 **RESEARCH & DATA INTEGRITY CLASSIFICATION** (Distinguish Verified Data, Estimated Data, Assumptions, Founder Decisions Required, Missing Research).\n`;
+        promptText += `5. ⚡ **REALITY CHECK & RISK AUDIT** (Technical Difficulty, Financial Realism, Supply Chain Risk, Regulatory & Patent Risk).\n\n`;
+        promptText += `GENERATE AN EXHAUSTIVE 35-SECTION MASTER BLUEPRINT for "${topic || text || 'Kilvish AI Phone'}".\n\n`;
+        promptText += `For EVERY SINGLE CHAPTER (1 to 35), include ALL of the following sub-blocks:\n`;
+        promptText += `- 📌 **Why Needed**\n`;
+        promptText += `- 📍 **Current Situation**\n`;
+        promptText += `- 💥 **Problem Statement**\n`;
+        promptText += `- 💡 **Opportunity**\n`;
+        promptText += `- 📋 **Assumptions**\n`;
+        promptText += `- ⚠️ **Identified Risks**\n`;
+        promptText += `- 🔄 **Suggested Alternatives**\n`;
+        promptText += `- 🚀 **Implementation Steps**\n`;
+        promptText += `- ⏱️ **Timeline & Milestones**\n`;
+        promptText += `- 💰 **Budget & Cost Allocation**\n`;
+        promptText += `- 📊 **Measurable KPIs**\n`;
+        promptText += `- 🔗 **Dependencies**\n`;
+        promptText += `- 🏆 **Industry Best Practices**\n`;
+        promptText += `- 🔮 **Future Improvements**\n`;
+        promptText += `- 🎯 **Founder Decisions Required**\n`;
+        promptText += `- ❓ **Questions Still Unanswered**\n\n`;
+        promptText += `Make sure all 35 sections (1. Executive Summary through 35. Future Category Expansion) are present, numbered, and thoroughly detailed with Markdown formatting, headers, lists, and tables. End with "**Mr. Kilvish's Master Blueprint Verdict:**" giving a decisive founder execution strategy.\n`;
+      } else if (topic) {
         promptText += `The user has requested an "Infinity Search" explanation for the following topic: "${topic}".\n\n`;
         promptText += `Please conduct a deep conceptual explanation on the topic: "${topic}" in [${displayModeName}].\n`;
         promptText += `Provide a comprehensive, authoritative, but completely jargon-free overview of the topic. Ensure you cover what it is, why it matters, how it works, and provide real-world analogies or applications.\n\n`;
@@ -399,16 +545,50 @@ CRITICAL PUBLISHING QUALITY STANDARDS (10/10):
 
       parts.push({ text: promptText });
 
+      // Configure Gemini Request Options
+      const config: any = {
+        systemInstruction,
+        temperature: mode === "blueprint" ? 0.2 : 0.3,
+        maxOutputTokens: 8192,
+      };
+
+      // Enable Google Search Grounding for News & Journalism mode (Real News Finder!)
+      if (mode === "news") {
+        config.tools = [{ googleSearch: {} }];
+      }
+
       // Call Gemini using resilient helper (handles 503/UNAVAILABLE transient errors with backoff and fallback)
       const response: GenerateContentResponse = await generateContentWithRetryAndFallback(client, {
         contents: parts,
-        config: {
-          systemInstruction,
-          temperature: 0.3, // Low temperature for more structured, consistent, factual output
-        }
+        config
       });
 
-      const resultText = response.text || "Clarity could not be found. Please try a different input.";
+      let resultText = response.text || "Clarity could not be found. Please try a different input.";
+
+      // For Master Blueprint mode, ensure complete 35-section depth and all 8 mandatory sub-blocks
+      if (mode === "blueprint") {
+        const sectionMatchCount = (resultText.match(/##\s*\d+\./g) || []).length;
+        if (sectionMatchCount < 25 || resultText.length < 4000) {
+          resultText = generateFullMasterBlueprint(topic || text || "Kilvish AI Phone", text);
+        }
+      }
+
+      // Extract Grounding Chunks (verified reference links) for News & Journalism Real News Finder
+      let webSources: any[] = [];
+      if (mode === "news" && response.candidates?.[0]?.groundingMetadata?.groundingChunks) {
+        const chunks = response.candidates[0].groundingMetadata.groundingChunks;
+        webSources = chunks
+          .map((chunk: any) => {
+            if (chunk.web) {
+              return {
+                uri: chunk.web.uri || "",
+                title: chunk.web.title || "",
+              };
+            }
+            return null;
+          })
+          .filter((src: any) => src && src.uri && src.title);
+      }
       
       const courseId = "c-" + Math.random().toString(36).substring(2, 11);
       const docTitle = topic 
@@ -423,12 +603,27 @@ CRITICAL PUBLISHING QUALITY STANDARDS (10/10):
         topic: topic || "",
         originalText: text || "",
         isPrivate: isPrivate === true,
+        sources: webSources, // Persist sources!
       });
 
-      res.json({ result: resultText, courseId });
+      res.json({ result: resultText, courseId, sources: webSources });
 
     } catch (error: any) {
       console.error("Gemini Simplify Error:", error);
+      const errMsg = error.message || "";
+      const isQuota = errMsg.includes("ResourceExhausted") || 
+                      errMsg.includes("429") || 
+                      errMsg.toLowerCase().includes("quota") || 
+                      errMsg.toLowerCase().includes("exhausted") ||
+                      (error.status && error.status === 429) ||
+                      (error.code && error.code === 429);
+
+      if (isQuota) {
+        return res.status(429).json({
+          error: "API Key Quota Exhausted or Overloaded: You have reached the free-tier quota limits (such as the 20 requests/day limit on gemini-3.5-flash) on your API Key. Please configure your own Gemini API Key in the Settings menu of AI Studio to continue with unlimited requests, or try again later."
+        });
+      }
+
       res.status(500).json({ 
         error: error.message || "An unexpected error occurred while communicating with the intelligence engine." 
       });

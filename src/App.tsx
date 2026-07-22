@@ -8,7 +8,7 @@ import HomeSection from "./components/HomeSection";
 import AboutSection from "./components/AboutSection";
 import CoursePage from "./components/CoursePage";
 import ReadabilitySidebar from "./components/ReadabilitySidebar";
-import { InputHistoryItem, SimplificationMode, OutputLanguage } from "./types";
+import { InputHistoryItem, SimplificationMode, OutputLanguage, WebSource } from "./types";
 import { EXAMPLES_DATA } from "./examplesData";
 import { 
   Upload, 
@@ -23,7 +23,16 @@ import {
   HelpCircle,
   TrendingUp,
   Search,
-  Infinity
+  Infinity,
+  Newspaper,
+  KeyRound,
+  Settings,
+  AlertTriangle,
+  Copy,
+  Check,
+  ExternalLink,
+  Compass,
+  FolderKanban
 } from "lucide-react";
 
 const TOPIC_SUGGESTIONS = [
@@ -40,11 +49,11 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<"home" | "workspace" | "about">("home");
   
   // Input form states
-  const [inputTab, setInputTab] = useState<"simplify" | "search">("simplify");
+  const [inputTab, setInputTab] = useState<"simplify" | "search" | "news" | "blueprint">("blueprint");
   const [searchTopic, setSearchTopic] = useState("");
-  const [inputText, setInputText] = useState(EXAMPLES_DATA[0].text);
-  const [inputTitle, setInputTitle] = useState(EXAMPLES_DATA[0].title);
-  const [mode, setMode] = useState<SimplificationMode>("academy");
+  const [inputText, setInputText] = useState("");
+  const [inputTitle, setInputTitle] = useState("");
+  const [mode, setMode] = useState<SimplificationMode>("blueprint");
   const [language, setLanguage] = useState<OutputLanguage>("hi");
   
   // File upload states
@@ -58,11 +67,13 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [kilvishStatus, setKilvishStatus] = useState<"idle" | "loading" | "speaking">("idle");
   const [error, setError] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   
   // Persisted clarity logs (history)
   const [history, setHistory] = useState<InputHistoryItem[]>([]);
   const [isPrivate, setIsPrivate] = useState(false);
+  const [currentSources, setCurrentSources] = useState<WebSource[]>([]);
   const [currentLogId, setCurrentLogId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -94,8 +105,10 @@ export default function App() {
   useEffect(() => {
     const checkRoute = () => {
       const pathname = window.location.pathname;
-      if (pathname.startsWith("/course/")) {
-        const id = pathname.substring("/course/".length);
+      if (pathname.startsWith("/course/") || pathname.startsWith("/read/")) {
+        const id = pathname.startsWith("/course/")
+          ? pathname.substring("/course/".length)
+          : pathname.substring("/read/".length);
         if (id) {
           setCourseRouteId(id);
           fetchCourseData(id);
@@ -167,6 +180,7 @@ export default function App() {
         setHistory(parsed);
         if (parsed.length > 0) {
           setCurrentLogId(parsed[0].id);
+          setCurrentSources(parsed[0].sources || []);
         }
       }
     } catch (e) {
@@ -224,42 +238,63 @@ export default function App() {
   // Handle loading an item from previous logs
   const handleSelectHistory = (item: InputHistoryItem) => {
     setCurrentLogId(item.id);
-    const isSearch = item.originalText.startsWith("Infinity Search on ");
-    if (isSearch) {
-      setInputTab("search");
-      // Extract topic from "Infinity Search on \"{topic}\""
+    
+    if (item.mode === "news") {
+      setInputTab("news");
+      // Search topic extraction if formatted as "Infinity Search on..."
       const match = item.originalText.match(/Infinity Search on "([^"]+)"/);
       if (match && match[1]) {
         setSearchTopic(match[1]);
       } else {
         setSearchTopic("");
       }
-      // Extract optional focus context from item.originalText after " with focus: "
       const focusIndex = item.originalText.indexOf(" with focus: ");
       if (focusIndex !== -1) {
         setInputText(item.originalText.substring(focusIndex + " with focus: ".length));
       } else {
-        setInputText("");
+        setInputText(item.originalText.startsWith("Infinity Search on ") ? "" : item.originalText);
       }
       setInputTitle("");
       handleClearFile();
     } else {
-      setInputTab("simplify");
-      setInputText(item.originalText);
-      setInputTitle(item.title);
-      if (item.imageAttached && item.imageData && item.imageMimeType) {
-        setFileName("Previous_Attachment.png");
-        setFileType("image");
-        setImageData(item.imageData);
-        setImageMimeType(item.imageMimeType);
-      } else {
+      const isSearch = item.originalText.startsWith("Infinity Search on ");
+      if (isSearch) {
+        setInputTab("search");
+        // Extract topic from "Infinity Search on \"{topic}\""
+        const match = item.originalText.match(/Infinity Search on "([^"]+)"/);
+        if (match && match[1]) {
+          setSearchTopic(match[1]);
+        } else {
+          setSearchTopic("");
+        }
+        // Extract optional focus context from item.originalText after " with focus: "
+        const focusIndex = item.originalText.indexOf(" with focus: ");
+        if (focusIndex !== -1) {
+          setInputText(item.originalText.substring(focusIndex + " with focus: ".length));
+        } else {
+          setInputText("");
+        }
+        setInputTitle("");
         handleClearFile();
+      } else {
+        setInputTab("simplify");
+        setInputText(item.originalText);
+        setInputTitle(item.title);
+        if (item.imageAttached && item.imageData && item.imageMimeType) {
+          setFileName("Previous_Attachment.png");
+          setFileType("image");
+          setImageData(item.imageData);
+          setImageMimeType(item.imageMimeType);
+        } else {
+          handleClearFile();
+        }
       }
     }
 
     setMode(item.mode);
     setLanguage(item.language || "en");
     setOutput(item.simplifiedText);
+    setCurrentSources(item.sources || []);
     setError(null);
   };
 
@@ -387,10 +422,23 @@ export default function App() {
     if (e) e.preventDefault();
 
     const currentTopicValue = customTopic !== undefined ? customTopic : searchTopic;
-    const isSearchMode = inputTab === "search" || customTopic !== undefined;
+    const isBlueprintMode = inputTab === "blueprint" || mode === "blueprint";
+    const isNewsMode = inputTab === "news";
+    const isSearchMode = inputTab === "search" || isNewsMode || isBlueprintMode || customTopic !== undefined;
+    const finalMode = isBlueprintMode ? "blueprint" : isNewsMode ? "news" : mode;
 
-    if (isSearchMode && !currentTopicValue.trim()) {
+    if (isBlueprintMode && !currentTopicValue.trim() && !inputText.trim()) {
+      setError("Please enter a project name/topic (e.g. 'Kilvish AI Phone') or details to build the master blueprint.");
+      return;
+    }
+
+    if (isSearchMode && !isNewsMode && !isBlueprintMode && !currentTopicValue.trim()) {
       setError("Please enter a topic to search and explain.");
+      return;
+    }
+
+    if (isNewsMode && !currentTopicValue.trim() && !inputText.trim() && !imageData) {
+      setError("Please enter a news headline, paste an article, or upload an image to verify.");
       return;
     }
 
@@ -403,18 +451,30 @@ export default function App() {
     setKilvishStatus("loading");
     setError(null);
     setOutput("");
+    setCurrentSources([]);
 
     try {
       const payload: any = {
-        mode: mode,
+        mode: finalMode,
         language: language,
         isPrivate: isPrivate,
       };
 
-      if (isSearchMode) {
-        payload.topic = currentTopicValue.trim();
+      if (isBlueprintMode) {
+        payload.topic = currentTopicValue.trim() || "Kilvish AI Phone";
+        payload.text = inputText.trim();
+      } else if (isSearchMode) {
+        if (currentTopicValue.trim()) {
+          payload.topic = currentTopicValue.trim();
+        }
         if (inputText.trim()) {
           payload.text = inputText.trim();
+        }
+        if (isNewsMode && imageData) {
+          payload.image = {
+            data: imageData,
+            mimeType: imageMimeType
+          };
         }
       } else {
         if (inputText.trim()) {
@@ -444,29 +504,37 @@ export default function App() {
 
       setOutput(data.result);
       setCurrentCourseId(data.courseId || null);
+      setCurrentSources(data.sources || []);
       setKilvishStatus("idle");
 
       // Fetch the updated Academy library courses immediately
       fetchAcademyCourses();
 
       // Save to logs
-      const finalTitle = isSearchMode 
-        ? `Search: ${currentTopicValue.trim()}`
-        : (inputTitle.trim() || `Clarity Log ${new Date().toLocaleDateString()}`);
+      const finalTitle = isBlueprintMode
+        ? `Master Blueprint: ${currentTopicValue.trim() || "Kilvish AI Phone"}`
+        : isNewsMode
+          ? `News: ${currentTopicValue.trim() || "Fact Check"}`
+          : isSearchMode 
+            ? `Search: ${currentTopicValue.trim()}`
+            : (inputTitle.trim() || `Clarity Log ${new Date().toLocaleDateString()}`);
 
       const logItem: InputHistoryItem = {
         id: Math.random().toString(36).substring(2, 9),
         title: finalTitle,
-        originalText: isSearchMode 
-          ? `Infinity Search on "${currentTopicValue.trim()}"` + (inputText.trim() ? ` with focus: ${inputText.trim()}` : "")
-          : (inputText.trim() || `Image text extracted from: ${fileName}`),
-        mode: mode,
+        originalText: isBlueprintMode
+          ? `35-Section Master Blueprint for "${currentTopicValue.trim() || "Kilvish AI Phone"}"` + (inputText.trim() ? ` (Specs: ${inputText.trim()})` : "")
+          : isSearchMode 
+            ? `Infinity Search on "${currentTopicValue.trim()}"` + (inputText.trim() ? ` with focus: ${inputText.trim()}` : "")
+            : (inputText.trim() || `Image text extracted from: ${fileName}`),
+        mode: finalMode,
         language: language,
         simplifiedText: data.result,
         timestamp: Date.now(),
-        imageAttached: !isSearchMode && !!imageData,
-        imageData: (!isSearchMode && imageData) ? imageData : undefined,
-        imageMimeType: (!isSearchMode && imageMimeType) ? imageMimeType : undefined
+        imageAttached: !!imageData,
+        imageData: imageData ? imageData : undefined,
+        imageMimeType: imageMimeType ? imageMimeType : undefined,
+        sources: data.sources || []
       };
 
       saveHistory([logItem, ...history].slice(0, 50)); // Limit to 50 logs for local storage
@@ -579,31 +647,136 @@ export default function App() {
                 </div>
 
                 {/* Error Indicator */}
-                {error && (
-                  <div className="flex items-start gap-2 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-[11px]">
-                    <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                    <div className="leading-relaxed">
-                      <span className="font-semibold font-mono">ERROR:</span> {error}
+                {error && (() => {
+                  const isQuotaError = 
+                    error.toLowerCase().includes("quota") || 
+                    error.toLowerCase().includes("exhausted") || 
+                    error.toLowerCase().includes("429") ||
+                    error.toLowerCase().includes("limit") ||
+                    error.toLowerCase().includes("busy");
+                  
+                  if (isQuotaError) {
+                    return (
+                      <div className="p-5 bg-amber-50/70 border border-amber-200/80 rounded-2xl flex flex-col gap-3.5 text-xs text-slate-800 shadow-sm animate-fadeIn">
+                        <div className="flex items-start gap-3">
+                          <div className="p-2 rounded-xl bg-amber-100 text-amber-800 shrink-0">
+                            <KeyRound className="w-5 h-5 animate-bounce" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide font-mono flex items-center gap-1.5">
+                              Gemini API Key Quota Exhausted
+                              <span className="px-1.5 py-0.5 rounded bg-amber-200/60 text-amber-800 text-[9px] font-mono font-bold">429</span>
+                            </h4>
+                            <p className="text-[11.5px] text-slate-600 mt-1 leading-relaxed">
+                              The shared environment API key has reached its free-tier rate limits or daily quota.
+                            </p>
+                          </div>
+                          <button 
+                            type="button" 
+                            onClick={() => setError(null)} 
+                            className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="border-t border-amber-200/50 pt-3 space-y-2.5">
+                          <p className="text-[11px] font-medium text-slate-700">
+                            👉 <strong className="text-slate-900 font-bold">Resolve this instantly</strong> with unlimited high-speed requests by adding your own free Gemini API key:
+                          </p>
+
+                          <ol className="list-decimal list-inside space-y-1.5 text-[11px] text-slate-600 pl-1">
+                            <li>
+                              Click the <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded font-semibold text-[10px]"><Settings className="w-3 h-3 text-slate-600" /> Settings</span> gear icon in the AI Studio UI (bottom-left or settings menu).
+                            </li>
+                            <li>
+                              Find the <strong className="text-slate-800 font-mono text-[10.5px]">Secrets / Env Variables</strong> section.
+                            </li>
+                            <li>
+                              Add a new secret variable named:
+                              <div className="mt-1.5 flex items-center gap-1.5">
+                                <code className="px-2 py-1 bg-white border border-slate-200 rounded font-mono text-[10.5px] font-bold text-slate-800">
+                                  GEMINI_API_KEY
+                                </code>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText("GEMINI_API_KEY");
+                                    setCopiedKey(true);
+                                    setTimeout(() => setCopiedKey(false), 2000);
+                                  }}
+                                  className="p-1 bg-white hover:bg-slate-50 border border-slate-200 rounded text-slate-500 hover:text-slate-800 transition-colors cursor-pointer inline-flex items-center justify-center"
+                                  title="Copy variable name"
+                                >
+                                  {copiedKey ? <Check className="w-3.5 h-3.5 text-emerald-600 font-bold" /> : <Copy className="w-3.5 h-3.5" />}
+                                </button>
+                              </div>
+                            </li>
+                            <li>
+                              Set the value to your Gemini API key (obtainable instantly for free from Google AI Studio).
+                            </li>
+                            <li>
+                              Click <strong className="text-slate-800 font-bold">Save Changes</strong> and try again!
+                            </li>
+                          </ol>
+
+                          <div className="flex gap-2.5 mt-2 pt-1 border-t border-amber-200/30">
+                            <a 
+                              href="https://aistudio.google.com" 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-950 hover:underline"
+                            >
+                              Get a Free API Key <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="flex items-start gap-2 p-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-[11px]">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                      <div className="leading-relaxed">
+                        <span className="font-semibold font-mono">ERROR:</span> {error}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
 
                 {/* Workspace Modes Tab Selector */}
-                <div className="flex bg-slate-100 p-1 rounded-lg">
+                <div className="grid grid-cols-2 sm:grid-cols-4 bg-slate-100 p-1 rounded-xl gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInputTab("blueprint");
+                      setMode("blueprint");
+                      setError(null);
+                    }}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2 text-[10.5px] font-mono font-bold uppercase rounded-lg transition-all duration-200 cursor-pointer ${
+                      inputTab === "blueprint"
+                        ? "bg-amber-600 text-white shadow-md ring-1 ring-amber-700"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+                    }`}
+                  >
+                    <Compass className="w-3.5 h-3.5 shrink-0" />
+                    <span>Master Blueprint</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
                       setInputTab("simplify");
                       setError(null);
                     }}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-mono font-bold uppercase rounded-md transition-all duration-200 cursor-pointer ${
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2 text-[10.5px] font-mono font-bold uppercase rounded-lg transition-all duration-200 cursor-pointer ${
                       inputTab === "simplify"
                         ? "bg-white text-slate-900 shadow-sm"
-                        : "text-slate-500 hover:text-slate-800"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
                     }`}
                   >
-                    <FileText className="w-3.5 h-3.5" />
-                    Simplify Document
+                    <FileText className="w-3.5 h-3.5 shrink-0" />
+                    <span>Simplify Text</span>
                   </button>
                   <button
                     type="button"
@@ -611,37 +784,203 @@ export default function App() {
                       setInputTab("search");
                       setError(null);
                     }}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-mono font-bold uppercase rounded-md transition-all duration-200 cursor-pointer ${
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2 text-[10.5px] font-mono font-bold uppercase rounded-lg transition-all duration-200 cursor-pointer ${
                       inputTab === "search"
                         ? "bg-white text-slate-900 shadow-sm"
-                        : "text-slate-500 hover:text-slate-800"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
                     }`}
                   >
-                    <Infinity className="w-3.5 h-3.5" />
-                    Infinity Search
+                    <Infinity className="w-3.5 h-3.5 shrink-0" />
+                    <span>Infinity Search</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInputTab("news");
+                      setMode("news");
+                      setError(null);
+                    }}
+                    className={`flex items-center justify-center gap-1.5 py-2 px-2 text-[10.5px] font-mono font-bold uppercase rounded-lg transition-all duration-200 cursor-pointer ${
+                      inputTab === "news"
+                        ? "bg-white text-slate-900 shadow-sm"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+                    }`}
+                  >
+                    <Newspaper className="w-3.5 h-3.5 shrink-0" />
+                    <span>News Finder</span>
                   </button>
                 </div>
 
                 <form onSubmit={handleSimplify} className="flex flex-col gap-4.5">
                   
-                  {inputTab === "search" ? (
+                  {inputTab === "blueprint" ? (
+                    <div className="flex flex-col gap-4.5 animate-fadeIn">
+                      {/* Project Name / Topic Input */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-mono font-bold text-amber-900 uppercase tracking-widest flex items-center justify-between">
+                          <span>Project Name or Hardware/Software Concept</span>
+                          <span className="text-amber-800 font-mono text-[9px] uppercase font-bold">[35-Sec Master Blueprint Engine]</span>
+                        </label>
+                        <div className="relative">
+                          <FolderKanban className="absolute left-3 top-2.5 w-3.5 h-3.5 text-amber-800" />
+                          <input
+                            type="text"
+                            placeholder="e.g., AI Smart Wearable Pin, Autonomous Agri Drone, EV Microgrid SaaS..."
+                            value={searchTopic}
+                            onChange={(e) => setSearchTopic(e.target.value)}
+                            className="w-full bg-amber-50/40 text-xs text-slate-900 placeholder:text-slate-400 pl-8.5 pr-3 py-2 rounded-lg border border-amber-200 focus:outline-none focus:border-amber-400 focus:bg-white font-sans transition-all duration-300 font-semibold"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Project Specs / Requirements / Notes */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                          <span>Project Features, Assumptions & Target Specs</span>
+                          <span className="text-slate-400 font-sans font-normal text-[9px]">[Optional custom context]</span>
+                        </label>
+                        <textarea
+                          placeholder="Describe target user, key hardware components (SoC, sensors), software stack, target price point, or initial funding goal..."
+                          value={inputText}
+                          onChange={(e) => setInputText(e.target.value)}
+                          className="w-full bg-slate-50 text-xs text-slate-800 placeholder:text-slate-400 px-3 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-slate-300 focus:bg-white min-h-[90px] max-h-[220px] font-sans transition-all duration-300 resize-y"
+                        />
+                      </div>
+
+                      {/* Presets / Templates */}
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider font-bold">
+                          Popular Master Blueprint Presets:
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {[
+                            "AI Smart Wearable Pin",
+                            "Autonomous Agri Drone Fleet",
+                            "AI Medical Diagnostic Station",
+                            "EV Fleet Microgrid & Battery SaaS",
+                            "Decentralized AI Compute Grid"
+                          ].map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => {
+                                setSearchTopic(preset);
+                                setInputText(`Build an investor-ready and engineering-ready 35-section master blueprint for: ${preset}. Include full hardware SoC choices, software stack, BOM estimates, EVT/DVT/PVT milestones, 5-year financials, risk register, 10-year roadmap, and specific founder questions.`);
+                                setError(null);
+                              }}
+                              className="px-2 py-1 text-[9.5px] font-mono bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-md transition-colors border border-amber-200 cursor-pointer font-medium"
+                            >
+                              + {preset}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : inputTab === "news" ? (
+                    <div className="flex flex-col gap-4.5 animate-fadeIn">
+                      {/* Claim/Headline Search Input */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                          <span>Headline, Topic or Claim to Fact-Check</span>
+                          <span className="text-emerald-600 font-mono text-[9px] uppercase font-bold">[Live Grounding Active]</span>
+                        </label>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="e.g., Tesla solar-powered car announcement, or NASA Mars discoveries?"
+                            value={searchTopic}
+                            onChange={(e) => setSearchTopic(e.target.value)}
+                            className="w-full bg-slate-50 text-xs text-slate-800 placeholder:text-slate-400 pl-8.5 pr-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:border-slate-300 focus:bg-white font-sans transition-all duration-300"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Paste Claim context or full article */}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                          <span>Pasted News Context / Rumor Text (Optional)</span>
+                          <span className="text-slate-400 font-sans font-normal text-[9px]">[Pasted claim]</span>
+                        </label>
+                        <textarea
+                          placeholder="Paste a suspicious social media claim, rumor post, or entire article text here for deep investigative analysis..."
+                          value={inputText}
+                          onChange={(e) => setInputText(e.target.value)}
+                          className="w-full bg-slate-50 text-xs text-slate-800 placeholder:text-slate-400 px-3 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:border-slate-300 focus:bg-white min-h-[100px] max-h-[220px] font-sans transition-all duration-300 resize-y"
+                        />
+                      </div>
+
+                      {/* Quick Topics */}
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider font-bold">
+                          Trending Hot Claims to Fact-Check:
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {[
+                            "India Gaganyaan spaceflight",
+                            "AI generates infinite clean fusion",
+                            "Universal Basic Income trial",
+                            "Room temp superconductivity claim"
+                          ].map((topicStr) => (
+                            <button
+                              key={topicStr}
+                              type="button"
+                              onClick={() => {
+                                setSearchTopic(topicStr);
+                                setError(null);
+                              }}
+                              className="px-1.5 py-0.5 text-[9.5px] font-mono bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-md transition-colors border border-transparent border-slate-200 cursor-pointer"
+                            >
+                              {topicStr}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ) : inputTab === "search" ? (
                     <>
                       {/* Topic Search Input */}
                       <div className="flex flex-col gap-1 animate-fadeIn">
                         <label className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
-                          <span>Enter Topic to Explain</span>
+                          <span>Enter Topic to Explain or Research</span>
                           <span className="text-blue-600 font-mono text-[9px] uppercase font-bold">[Infinity Core]</span>
                         </label>
                         <div className="relative">
                           <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
                           <input
                             type="text"
-                            placeholder="e.g., Quantum Computing, Photosynthesis, Stock Options..."
+                            placeholder="e.g., Kilvish AI Phone, Quantum Computing, Microgrid SaaS..."
                             value={searchTopic}
                             onChange={(e) => setSearchTopic(e.target.value)}
-                            className="w-full bg-slate-50 text-xs text-slate-800 placeholder:text-slate-400 pl-8.5 pr-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:border-slate-300 focus:bg-white font-sans transition-all duration-300"
+                            className="w-full bg-slate-50 text-xs text-slate-800 placeholder:text-slate-400 pl-8.5 pr-3 py-2 rounded-lg border border-slate-200 focus:outline-none focus:border-slate-300 focus:bg-white font-sans transition-all duration-300 font-medium"
                           />
                         </div>
+                      </div>
+
+                      {/* Blueprint Shortcut Banner inside Infinity Search */}
+                      <div className="bg-amber-50/60 border border-amber-200/80 rounded-lg p-2.5 flex items-center justify-between gap-2 animate-fadeIn">
+                        <div className="flex items-center gap-2">
+                          <Compass className="w-4 h-4 text-amber-700 shrink-0" />
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-mono font-bold text-amber-950 uppercase tracking-wide">
+                              35-Section Master Blueprint Mode
+                            </span>
+                            <span className="text-[9.5px] text-amber-800 font-sans">
+                              Turn this search topic into an investor & engineering company blueprint.
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMode("blueprint");
+                            setInputTab("blueprint");
+                            setError(null);
+                          }}
+                          className="px-2.5 py-1 text-[10px] font-mono font-bold uppercase bg-amber-600 hover:bg-amber-700 text-white rounded-md transition-all shadow-sm cursor-pointer shrink-0"
+                        >
+                          Use Blueprint Mode
+                        </button>
                       </div>
 
                       {/* Suggested Topics Pills */}
@@ -775,7 +1114,19 @@ export default function App() {
                   )}
 
                   {/* Mode Selection */}
-                  <ModeSelector activeMode={mode} onChange={setMode} />
+                  {inputTab === "news" ? (
+                    <div className="p-3.5 bg-emerald-50/50 border border-emerald-100 rounded-xl flex items-center gap-3 animate-fadeIn">
+                      <div className="p-1 rounded bg-emerald-100 text-emerald-600 shrink-0">
+                        <Newspaper className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-bold text-slate-800 uppercase tracking-tight">Locked: News & Journalism</div>
+                        <div className="text-[9.5px] text-slate-500">Real-time web search grounding enabled for factual investigation.</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <ModeSelector activeMode={mode} onChange={setMode} />
+                  )}
 
                   {/* Language Selection */}
                   <div className="flex flex-col gap-2">
@@ -862,17 +1213,21 @@ export default function App() {
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full relative py-2.5 px-3.5 rounded-lg font-display font-bold text-[11px] uppercase tracking-wider text-white bg-slate-900 hover:bg-slate-850 active:scale-[0.99] disabled:opacity-50 transition-all duration-300 shadow-md flex items-center justify-center gap-1.5 cursor-pointer mt-1"
+                    className={`w-full relative py-2.5 px-3.5 rounded-lg font-display font-bold text-[11px] uppercase tracking-wider text-white transition-all duration-300 shadow-md flex items-center justify-center gap-1.5 cursor-pointer mt-1 ${
+                      inputTab === "blueprint"
+                        ? "bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 hover:brightness-110 active:scale-[0.99] border border-amber-500/50"
+                        : "bg-slate-900 hover:bg-slate-850 active:scale-[0.99]"
+                    } disabled:opacity-50`}
                   >
                     {isLoading ? (
                       <>
                         <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>SYNTHESIZING...</span>
+                        <span>SYNTHESIZING BLUEPRINT...</span>
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>{inputTab === "search" ? "Search & Explain" : "Banish Jargon"}</span>
+                        <Compass className="w-3.5 h-3.5" />
+                        <span>{inputTab === "blueprint" ? "Generate Master Blueprint (35 Sections)" : inputTab === "search" ? "Search & Explain" : inputTab === "news" ? "Fact-Check Claim" : "Banish Jargon"}</span>
                         <ArrowRight className="w-3.5 h-3.5 text-white" />
                       </>
                     )}
@@ -905,6 +1260,13 @@ export default function App() {
                 }}
                 rating={history.find((item) => item.id === currentLogId)?.rating}
                 onRate={handleRate}
+                onSelectTopic={(topic) => {
+                  setSearchTopic(topic);
+                  setInputTab("search");
+                  setError(null);
+                  handleSimplify(undefined, topic);
+                }}
+                sources={currentSources}
               />
 
               {/* Knowledge Insight Card: Simple UI decoration showing the rules in motion */}

@@ -40,9 +40,12 @@ import {
   Play,
   Pause,
   Sliders,
-  Zap
+  Zap,
+  Link,
+  QrCode,
+  Compass
 } from "lucide-react";
-import { OutputLanguage } from "../types";
+import { OutputLanguage, WebSource } from "../types";
 
 // High-fidelity vector QR Code generator helper
 const QRCodeSVG = () => (
@@ -131,6 +134,172 @@ const extractText = (node: any): string => {
   return "";
 };
 
+export interface QuizQuestion {
+  question: string;
+  options: string[];
+  answerIndex: number;
+  explanation: string;
+}
+
+export function getRelatedTopics(text: string): string[] {
+  if (!text) return ["Artificial Intelligence", "Space Exploration", "How the Internet Works", "Behavioral Economics"];
+  const lower = text.toLowerCase();
+  if (lower.includes("quantum") || lower.includes("qubit") || lower.includes("physics")) {
+    return ["Quantum Entanglement", "Quantum Teleportation", "Quantum Cryptography", "Quantum Supremacy"];
+  }
+  if (lower.includes("inflation") || lower.includes("bank") || lower.includes("money") || lower.includes("finance")) {
+    return ["Hyperinflation History", "How Interest Rates Work", "The Federal Reserve", "Cryptocurrency vs Fiat"];
+  }
+  if (lower.includes("blockchain") || lower.includes("bitcoin") || lower.includes("crypto")) {
+    return ["Smart Contracts 101", "Ethereum & Web3", "Proof of Work vs Stake", "DeFi Explained"];
+  }
+  if (lower.includes("crispr") || lower.includes("gene") || lower.includes("dna") || lower.includes("biology")) {
+    return ["Genetic Engineering Ethics", "Gene Drives Explained", "Human Genome Project", "How mRNA Vaccines Work"];
+  }
+  if (lower.includes("photosynthesis") || lower.includes("chlorophyll") || lower.includes("plant") || lower.includes("energy")) {
+    return ["The Calvin Cycle", "Cellular Respiration", "How Chloroplasts Work", "Artificial Photosynthesis"];
+  }
+  if (lower.includes("machine learning") || lower.includes("ai") || lower.includes("artificial intelligence") || lower.includes("neural")) {
+    return ["Neural Networks", "Deep Learning vs Machine Learning", "How ChatGPT Works", "AI Safety & Ethics"];
+  }
+  return ["Artificial Intelligence", "Space Exploration", "How the Internet Works", "Behavioral Economics"];
+}
+
+export function getQuizQuestions(text: string): QuizQuestion[] {
+  if (!text) return [];
+  const lower = text.toLowerCase();
+  if (lower.includes("quantum") || lower.includes("qubit") || lower.includes("physics")) {
+    return [
+      {
+        question: "What is the fundamental unit of information in a quantum computer?",
+        options: ["Bit", "Qubit", "Byte", "Quantum Node"],
+        answerIndex: 1,
+        explanation: "Unlike classical bits which are 0 or 1, qubits utilize superposition to exist in both states simultaneously."
+      },
+      {
+        question: "Which quantum principle allows particles to remain connected across vast distances?",
+        options: ["Superposition", "Entanglement", "Decoherence", "Interference"],
+        answerIndex: 1,
+        explanation: "Quantum entanglement is a phenomenon where entangled particles show perfectly correlated states regardless of distance."
+      },
+      {
+        question: "What happens when a quantum state is measured/observed?",
+        options: ["It collapses to a classical state", "It speeds up", "It splits into three states", "Nothing changes"],
+        answerIndex: 0,
+        explanation: "Observation causes wave function collapse, turning a superposition of possibilities into a single definite classical state."
+      }
+    ];
+  }
+  if (lower.includes("inflation") || lower.includes("bank") || lower.includes("money") || lower.includes("finance")) {
+    return [
+      {
+        question: "What generally causes demand-pull inflation?",
+        options: ["Excessive money supply and high consumer spending", "Increase in production costs", "Government tax cuts only", "Decline in global trade"],
+        answerIndex: 0,
+        explanation: "Demand-pull inflation happens when aggregate demand for goods and services outpaces aggregate supply."
+      },
+      {
+        question: "How do Central Banks typically fight high inflation?",
+        options: ["By lowering interest rates", "By printing more paper currency", "By raising interest rates", "By buying back all government debt"],
+        answerIndex: 2,
+        explanation: "By raising interest rates, central banks make borrowing expensive, which cools down consumer demand and slows price rises."
+      },
+      {
+        question: "What is Hyperinflation?",
+        options: ["Very low, steady inflation", "Extremely rapid, out-of-control price increases", "Negative inflation rates", "Stable asset prices"],
+        answerIndex: 1,
+        explanation: "Hyperinflation is characterized by extreme price increases, often exceeding 50% per month, destroying the value of local currency."
+      }
+    ];
+  }
+  if (lower.includes("blockchain") || lower.includes("bitcoin") || lower.includes("crypto")) {
+    return [
+      {
+        question: "Who is credited with creating Bitcoin and the first blockchain implementation?",
+        options: ["Satoshi Nakamoto", "Vitalik Buterin", "Ada Lovelace", "Elon Musk"],
+        answerIndex: 0,
+        explanation: "Bitcoin was created by an anonymous developer or group of developers under the pseudonym Satoshi Nakamoto in 2008."
+      },
+      {
+        question: "What makes a blockchain highly resistant to tampering?",
+        options: ["Its high price on markets", "Cryptographic hashes linking blocks in a decentralized network", "Its storage on standard cloud servers", "Its ownership by major banks"],
+        answerIndex: 1,
+        explanation: "Each block contains the cryptographic hash of the previous block. Changing one block would require recalculating all subsequent hashes."
+      },
+      {
+        question: "What is a 'Smart Contract'?",
+        options: ["A legally binding paper contract", "Self-executing code stored on the blockchain", "A specialized hardware wallet", "An AI algorithm for trading"],
+        answerIndex: 1,
+        explanation: "Smart contracts are programs that run automatically when predetermined conditions are met on the blockchain, without intermediaries."
+      }
+    ];
+  }
+  if (lower.includes("crispr") || lower.includes("gene") || lower.includes("dna") || lower.includes("biology")) {
+    return [
+      {
+        question: "What does the CRISPR system originally represent in nature?",
+        options: ["A human immune response mechanism", "An ancient bacterial defense system against viruses", "A synthetic laboratory drug", "A plant growth hormone"],
+        answerIndex: 1,
+        explanation: "CRISPR-Cas9 evolved as an adaptive immune system in bacteria to target and cut viral DNA that tries to infect them."
+      },
+      {
+        question: "Which protein acts as the 'molecular scissors' in the CRISPR system to cut DNA?",
+        options: ["Cas9", "Helicase", "Polymerase", "Insulin"],
+        answerIndex: 0,
+        explanation: "Cas9 is the specialized endonuclease protein that cuts the double-stranded DNA target guided by the guide RNA."
+      },
+      {
+        question: "What role does the Guide RNA (gRNA) play in gene editing?",
+        options: ["It provides the energy to cut DNA", "It directs the Cas9 scissors to the exact coordinate to cut", "It repairs the cell's broken DNA", "It creates new cells"],
+        answerIndex: 1,
+        explanation: "The Guide RNA contains a sequence that matches the target DNA site, directing the Cas9 protein to cut at that specific location."
+      }
+    ];
+  }
+  if (lower.includes("photosynthesis") || lower.includes("chlorophyll") || lower.includes("plant") || lower.includes("energy")) {
+    return [
+      {
+        question: "Which cell organelle is the primary site of photosynthesis in plants?",
+        options: ["Mitochondria", "Chloroplast", "Nucleus", "Ribosome"],
+        answerIndex: 1,
+        explanation: "Photosynthesis occurs inside chloroplasts, which contain chlorophyll to capture sunlight."
+      },
+      {
+        question: "What are the primary inputs needed for photosynthesis?",
+        options: ["Oxygen, Glucose, and Water", "Carbon Dioxide, Water, and Sunlight", "Nitrogen, Oxygen, and Soil", "Glucose and Carbon Dioxide"],
+        answerIndex: 1,
+        explanation: "Plants use Carbon Dioxide (CO2), Water (H2O), and solar energy to manufacture glucose and oxygen."
+      },
+      {
+        question: "What is the secondary light-independent pathway of photosynthesis often called?",
+        options: ["Krebs Cycle", "Calvin Cycle", "Glycolysis", "Electron Transport Chain"],
+        answerIndex: 1,
+        explanation: "The Calvin Cycle occurs in the stroma and does not require direct light, converting CO2 into sugars."
+      }
+    ];
+  }
+  return [
+    {
+      question: "What is the core philosophy of 'Readability' by Mr. Kilvish?",
+      options: ["Using complex terminology to look smart", "Banishing dark, heavy jargon to reveal pure crystal-clear clarity", "Memorizing textbook tables", "Hiring expensive professional tutors"],
+      answerIndex: 1,
+      explanation: "Mr. Kilvish's sacred mandate is 'Clarity shall prevail!', transforming obscure and complex texts into simple, high-impact learning materials."
+    },
+    {
+      question: "How does simplifying complex vocabulary help human memory?",
+      options: ["It reduces cognitive load and allows building strong mental models", "It makes reading slower", "It helps skip exam chapters completely", "It has no measurable benefit"],
+      answerIndex: 0,
+      explanation: "By removing jargon and using everyday analogies, the brain can map new terms to existing concepts easily, boosting long-term memory."
+    },
+    {
+      question: "Which display mood is designed to teach with maximum scientific and conceptual detail?",
+      options: ["ELI5 Mode", "Pro Mode", "Student Mode", "Wipe Mode"],
+      answerIndex: 2,
+      explanation: "Student Mode is highly structured and focuses systematically on academic terminology, deep definitions, and step-by-step concepts."
+    }
+  ];
+}
+
 interface OutputDisplayProps {
   text: string;
   isLoading: boolean;
@@ -139,10 +308,14 @@ interface OutputDisplayProps {
   currentCourseId?: string | null;
   rating?: number;
   onRate?: (rating: number) => void;
+  onSelectTopic?: (topic: string) => void;
+  sources?: WebSource[];
 }
 
-export default function OutputDisplay({ text, isLoading, language = "en", onSpeechStateChange, currentCourseId, rating, onRate }: OutputDisplayProps) {
+export default function OutputDisplay({ text, isLoading, language = "en", onSpeechStateChange, currentCourseId, rating, onRate, onSelectTopic, sources }: OutputDisplayProps) {
   const [copied, setCopied] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [showQrPopover, setShowQrPopover] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [speechUtterance, setSpeechUtterance] = useState<SpeechSynthesisUtterance | null>(null);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -153,6 +326,11 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
   const [premiumVoice, setPremiumVoice] = useState<string>("Zephyr"); // Puck, Charon, Kore, Fenrir, Zephyr
   const premiumAudioCtxRef = useRef<AudioContext | null>(null);
   const premiumAudioSourceRef = useRef<AudioBufferSourceNode | null>(null);
+
+  // Interactive Quiz state
+  const [userQuizAnswers, setUserQuizAnswers] = useState<Record<number, number>>({});
+  const [showQuizExpl, setShowQuizExpl] = useState<Record<number, boolean>>({});
+  const [quizSuccessCount, setQuizSuccessCount] = useState(0);
 
   // Stop narration if the component unmounts
   useEffect(() => {
@@ -176,6 +354,13 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
   // Typewriter animation states
   const [displayedText, setDisplayedText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+
+  // Reset quiz states when new text is generated or loaded
+  useEffect(() => {
+    setUserQuizAnswers({});
+    setShowQuizExpl({});
+    setQuizSuccessCount(0);
+  }, [text]);
 
   const [speechRate, setSpeechRate] = useState(1.0);
   const [speechPitch, setSpeechPitch] = useState(0.95);
@@ -339,6 +524,39 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error("Failed to copy text:", err);
+    }
+  };
+
+  const handleCopyShareLink = async () => {
+    if (!currentCourseId) return;
+    const shareUrl = `${window.location.origin}/read/${currentCourseId}`;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy share link:", err);
+    }
+  };
+
+  const handleNativeShare = async () => {
+    if (!currentCourseId) return;
+    const shareUrl = `${window.location.origin}/read/${currentCourseId}`;
+    const shareTitle = "Readability AI Simplified Learning Page";
+    const shareText = "Check out this ultra-simplified explanation powered by Mr. Kilvish!";
+    
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: shareUrl,
+        });
+      } catch (err) {
+        console.error("Native share failed or canceled:", err);
+      }
+    } else {
+      await handleCopyShareLink();
     }
   };
 
@@ -1013,6 +1231,17 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
   };
 
   const handleExportPDF = () => {
+    if (language === "hi" || language === "hinglish") {
+      const usePrint = window.confirm(
+        language === "hi"
+          ? "हिन्दी दस्तावेज़ों के लिए, पीडीएफ डाउनलोड में कुछ त्रुटियाँ (garbled text) आ सकती हैं। सर्वोत्तम क्वालिटी और सही लिखावट के लिए, कृपया 'PRINT' बटन दबाएं और प्रिंटर विकल्पों में 'Save as PDF' चुनें।\n\nक्या आप अभी भी सामान्य पीडीएफ डाउनलोड करना चाहते हैं? (या 'रद्द करें / Cancel' पर क्लिक करके 'PRINT' का उपयोग करें)"
+          : "For Hindi/Hinglish content, standard PDF downloads might display garbled characters. For perfect styling, fonts, and text rendering, we highly recommend using the 'PRINT' button and selecting 'Save as PDF' in the system print dialog.\n\nDo you still want to proceed with standard PDF download? (Click 'Cancel' to try the 'PRINT' option instead)"
+      );
+      if (!usePrint) {
+        handlePrint();
+        return;
+      }
+    }
     try {
       const doc = new jsPDF({
         orientation: "portrait",
@@ -1845,6 +2074,53 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
           </div>
         </div>
 
+        {/* Master Blueprint Studio Banner if report is a Master Blueprint */}
+        {(text.includes("MASTER BLUEPRINT") || text.includes("35-SECTION") || text.includes("35-Section") || (text.includes("Executive Summary") && text.includes("Financial Model"))) && (
+          <div className="mb-4 p-4.5 bg-gradient-to-r from-slate-900 via-amber-950 to-slate-950 text-white rounded-2xl border border-amber-500/40 shadow-xl relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+            
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-400 shrink-0 shadow-inner">
+                  <Compass className="w-6 h-6 animate-pulse" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[9px] font-mono font-bold text-amber-300 uppercase tracking-widest bg-amber-500/20 px-2 py-0.5 rounded-full border border-amber-500/30">
+                      35-SECTION MASTER BLUEPRINT STUDIO
+                    </span>
+                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                      INVESTOR & ENGINEERING READY
+                    </span>
+                  </div>
+                  <h3 className="text-base font-extrabold font-sans text-white tracking-tight mt-1">
+                    Exhaustive Product & Hardware Architecture Report
+                  </h3>
+                  <p className="text-amber-200/80 text-[11px] mt-0.5 leading-snug">
+                    Includes all 35 sections with BOM cost tables, 5-Yr Financial P&L, EVT/DVT/PVT schedule, Risk Matrix & 8 mandatory sub-blocks per section.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
+                <div className="bg-slate-950/80 border border-amber-500/30 p-2.5 rounded-xl flex flex-col text-center min-w-[90px]">
+                  <span className="text-[8px] font-mono text-slate-400 uppercase font-bold">Total Sections</span>
+                  <span className="text-xs font-mono font-bold text-amber-400 mt-0.5">35 / 35 Full</span>
+                </div>
+                <div className="bg-slate-950/80 border border-amber-500/30 p-2.5 rounded-xl flex flex-col text-center min-w-[90px]">
+                  <span className="text-[8px] font-mono text-slate-400 uppercase font-bold">Unit BOM</span>
+                  <span className="text-xs font-mono font-bold text-emerald-400 mt-0.5">$435.00 Unit</span>
+                </div>
+                <div className="bg-slate-950/80 border border-amber-500/30 p-2.5 rounded-xl flex flex-col text-center min-w-[90px]">
+                  <span className="text-[8px] font-mono text-slate-400 uppercase font-bold">Gross Margin</span>
+                  <span className="text-xs font-mono font-bold text-indigo-400 mt-0.5">51.6% Margin</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Sovereign Student progress dashboard */}
         <div className="mb-4 p-4.5 bg-gradient-to-br from-slate-900 to-indigo-950 text-white rounded-xl border border-slate-800 shadow-lg relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl" />
@@ -2275,6 +2551,198 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
           </Markdown>
         </div>
 
+        {/* Dynamic Concept-Map Explorer & Related Sub-topics */}
+        {onSelectTopic && text && (
+          <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col gap-3.5">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4.5 h-4.5 text-teal-600 animate-[spin_4s_linear_infinite]" />
+              <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider font-mono">
+                Infinity Concept Loop: Next Explanations
+              </h4>
+            </div>
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Where do you want to take your knowledge next? Click any related concept below to instantly trigger an autonomous &quot;Infinity Search&quot; explanation on that topic:
+            </p>
+            <div className="flex flex-wrap gap-2.5 mt-1">
+              {getRelatedTopics(text).map((related, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => onSelectTopic(related)}
+                  className="px-3 py-2 bg-teal-50/50 hover:bg-teal-50 border border-teal-100/70 hover:border-teal-200 text-teal-700 rounded-xl text-xs font-semibold font-mono tracking-wide cursor-pointer transition-all duration-300 hover:shadow-sm flex items-center gap-1.5 hover:-translate-y-0.5 active:translate-y-0"
+                >
+                  <span>{related}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Interactive MCQ Knowledge Quiz Widget */}
+        {text && getQuizQuestions(text).length > 0 && (
+          <div className="mt-8 p-6 bg-indigo-50/40 rounded-2xl border border-indigo-100/50 flex flex-col gap-5">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-indigo-600 animate-pulse" />
+                <div>
+                  <h4 className="text-xs font-bold text-slate-950 uppercase tracking-wider font-mono">
+                    Sovereign Concept Quiz
+                  </h4>
+                  <p className="text-[10px] text-indigo-600 font-bold font-mono tracking-widest mt-0.5">
+                    TEST YOUR COMPREHENSION
+                  </p>
+                </div>
+              </div>
+              {Object.keys(userQuizAnswers).length === getQuizQuestions(text).length && (
+                <div className="px-3.5 py-1.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-mono font-bold text-emerald-700 flex items-center gap-1.5 animate-bounce">
+                  <Award className="w-4 h-4" />
+                  <span>QUIZ COMPLETE: {Object.entries(userQuizAnswers).filter(([idx, ans]) => ans === getQuizQuestions(text)[Number(idx)].answerIndex).length}/{getQuizQuestions(text).length} EXP</span>
+                </div>
+              )}
+            </div>
+
+            <p className="text-[11px] text-slate-500 leading-relaxed border-b border-indigo-100/30 pb-3">
+              Mr. Kilvish has formulated these questions directly from this syllabus. Select your answers to check your real-world application score.
+            </p>
+
+            <div className="space-y-6">
+              {getQuizQuestions(text).map((q, qIdx) => {
+                const isAnswered = userQuizAnswers[qIdx] !== undefined;
+                const chosenOptIdx = userQuizAnswers[qIdx];
+                const isCorrect = chosenOptIdx === q.answerIndex;
+                const showExplanation = showQuizExpl[qIdx];
+
+                return (
+                  <div key={qIdx} className="flex flex-col gap-3 p-4 bg-white rounded-xl border border-slate-150 shadow-sm">
+                    <div className="flex items-start gap-2.5">
+                      <span className="w-5 h-5 rounded-full bg-slate-900 text-white font-mono text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                        0{qIdx + 1}
+                      </span>
+                      <h5 className="text-xs sm:text-sm font-semibold text-slate-900 leading-snug">
+                        {q.question}
+                      </h5>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-1.5">
+                      {q.options.map((opt, optIdx) => {
+                        const isOptionChosen = chosenOptIdx === optIdx;
+                        const isCorrectOption = optIdx === q.answerIndex;
+                        let optionStyle = "border-slate-200 text-slate-700 hover:bg-slate-50";
+
+                        if (isAnswered) {
+                          if (isOptionChosen) {
+                            optionStyle = isCorrect
+                              ? "bg-emerald-50 border-emerald-300 text-emerald-800 font-semibold"
+                              : "bg-rose-50 border-rose-300 text-rose-800 font-semibold";
+                          } else if (isCorrectOption) {
+                            optionStyle = "bg-emerald-50/50 border-emerald-200 text-emerald-800 font-semibold";
+                          } else {
+                            optionStyle = "opacity-50 border-slate-100 text-slate-400";
+                          }
+                        }
+
+                        return (
+                          <button
+                            key={optIdx}
+                            type="button"
+                            disabled={isAnswered}
+                            onClick={() => {
+                              setUserQuizAnswers(prev => ({ ...prev, [qIdx]: optIdx }));
+                              setShowQuizExpl(prev => ({ ...prev, [qIdx]: true }));
+                            }}
+                            className={`px-3.5 py-3 rounded-xl border text-left text-xs transition-all duration-200 flex items-center justify-between ${optionStyle} ${!isAnswered ? "cursor-pointer active:scale-[0.99]" : ""}`}
+                          >
+                            <span>{opt}</span>
+                            {isAnswered && isOptionChosen && (
+                              isCorrect ? (
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 ml-2" />
+                              ) : (
+                                <XCircle className="w-4 h-4 text-rose-600 shrink-0 ml-2" />
+                              )
+                            )}
+                            {isAnswered && !isOptionChosen && isCorrectOption && (
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500/70 shrink-0 ml-2" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {showExplanation && (
+                      <div className="p-3 bg-slate-50 border border-slate-150 rounded-lg text-[11px] text-slate-600 leading-relaxed mt-1 flex items-start gap-2 animate-[fadeIn_0.3s_ease-out]">
+                        <Info className="w-3.5 h-3.5 text-indigo-500 shrink-0 mt-0.5" />
+                        <div>
+                          <strong className="font-semibold text-slate-900 uppercase tracking-wide font-mono text-[10px] block mb-0.5">
+                            {isCorrect ? "Correct! Clarity Gained:" : "Oops! Under Review:"}
+                          </strong>
+                          {q.explanation}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Verified Sources & Web Grounding */}
+        {sources && sources.length > 0 && (
+          <div className="mt-8 p-6 bg-emerald-50/30 rounded-2xl border border-emerald-100/50 flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <Shield className="w-5 h-5 text-emerald-600 animate-pulse" />
+              <div>
+                <h4 className="text-xs font-bold text-slate-950 uppercase tracking-wider font-mono">
+                  Verified Sources & Web Grounding
+                </h4>
+                <p className="text-[10px] text-emerald-600 font-bold font-mono tracking-widest mt-0.5 uppercase">
+                  REAL-TIME SEARCH CITATIONS & FACT CHECK EVIDENCE
+                </p>
+              </div>
+            </div>
+
+            <p className="text-[11px] text-slate-500 leading-relaxed border-b border-emerald-100/30 pb-3">
+              These are live reference articles and source databases utilized in real-time by Mr. Kilvish to check facts, find real news, and grounding-verify this editorial dispatch:
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {sources.map((src, srcIdx) => {
+                let hostname = "Source Link";
+                try {
+                  hostname = new URL(src.uri).hostname;
+                } catch (e) {
+                  // Fallback if not a valid URL
+                }
+                return (
+                  <a
+                    key={srcIdx}
+                    href={src.uri}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-start gap-2.5 p-3.5 bg-white hover:bg-slate-50 border border-slate-150 rounded-xl transition-all hover:shadow-sm group cursor-pointer"
+                  >
+                    <span className="w-5 h-5 rounded-lg bg-emerald-100 text-emerald-800 font-mono text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-emerald-200">
+                      {srcIdx + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <h5 className="text-[11.5px] font-semibold text-slate-800 leading-snug group-hover:text-emerald-700 transition-colors line-clamp-2">
+                        {src.title}
+                      </h5>
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <span className="text-[9px] font-mono font-semibold text-slate-400 max-w-full truncate block">
+                          {hostname}
+                        </span>
+                        <ExternalLink className="w-3 h-3 text-slate-400 group-hover:text-emerald-600 transition-colors shrink-0" />
+                      </div>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Interactive Companion Learning Grid & AI Prompt Sandbox */}
         <div className="mt-10 border-t border-slate-100 pt-8 space-y-8">
           
@@ -2407,6 +2875,116 @@ export default function OutputDisplay({ text, isLoading, language = "en", onSpee
               })}
             </div>
           </div>
+
+          {/* Share & Distribute Section */}
+          {currentCourseId && (
+            <div className="p-5 bg-white rounded-2xl border border-slate-200 flex flex-col gap-4 mt-8 animate-[fadeIn_0.4s_ease-out]">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex-1">
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                    <Share2 className="w-4 h-4 text-indigo-600" />
+                    Share & Distribute Simplified Knowledge
+                  </h4>
+                  <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                    Generate a permanent, lightning-fast study link to let students or readers restore this exact simplified output instantly.
+                  </p>
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  {/* Copy Link button */}
+                  <button
+                    type="button"
+                    onClick={handleCopyShareLink}
+                    className={`px-3 py-2 rounded-xl border text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-all duration-300 ${
+                      shareCopied
+                        ? "bg-emerald-50 border-emerald-200 text-emerald-600 shadow-sm"
+                        : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                    }`}
+                    title="Copy permanent shareable link"
+                  >
+                    {shareCopied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>COPIED LINK</span>
+                      </>
+                    ) : (
+                      <>
+                        <Link className="w-3.5 h-3.5 text-slate-500" />
+                        <span>COPY LINK</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Share button */}
+                  <button
+                    type="button"
+                    onClick={handleNativeShare}
+                    className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
+                    title="Share to native device channels (Android/iOS) or other apps"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>SHARE</span>
+                  </button>
+
+                  {/* QR Code button */}
+                  <button
+                    type="button"
+                    onClick={() => setShowQrPopover(!showQrPopover)}
+                    className={`px-3 py-2 rounded-xl border text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer transition-all ${
+                      showQrPopover
+                        ? "bg-slate-100 border-slate-300 text-slate-900"
+                        : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                    }`}
+                    title="Generate printable dynamic QR Code"
+                  >
+                    <QrCode className="w-3.5 h-3.5 text-slate-500" />
+                    <span>QR CODE</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Shareable Link Input box */}
+              <div className="flex items-center gap-2 p-2 bg-slate-50 border border-slate-100 rounded-xl">
+                <span className="text-[10px] font-mono font-extrabold text-slate-400 uppercase tracking-widest pl-1 shrink-0">Permanent URL:</span>
+                <input
+                  type="text"
+                  readOnly
+                  value={`${window.location.origin}/read/${currentCourseId}`}
+                  className="flex-1 bg-transparent border-none text-[11px] font-mono text-indigo-600 outline-none select-all font-semibold"
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                />
+              </div>
+
+              {/* Interactive QR Code Display Panel */}
+              {showQrPopover && (
+                <div className="flex flex-col sm:flex-row items-center gap-5 p-4.5 bg-slate-50 border border-slate-200/60 rounded-xl animate-[fadeIn_0.3s_ease-out]">
+                  <div className="p-2 bg-white border border-slate-200/80 rounded-xl shadow-sm shrink-0">
+                    <img
+                      src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`${window.location.origin}/read/${currentCourseId}`)}`}
+                      alt="Share QR Code"
+                      className="w-28 h-28 sm:w-32 sm:h-32 object-contain"
+                    />
+                  </div>
+                  <div className="flex-1 text-center sm:text-left space-y-2">
+                    <h5 className="text-[11px] font-bold text-slate-900 uppercase tracking-wider font-mono">Dynamic QR Code Active</h5>
+                    <p className="text-[10px] text-slate-500 leading-relaxed max-w-sm">
+                      Scan this code with any mobile camera, smartphone scanner, or tablet to instantly jump directly to this simplified page layout on Android, iOS, or iPadOS.
+                    </p>
+                    <div className="flex justify-center sm:justify-start gap-2">
+                      <a
+                        href={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(`${window.location.origin}/read/${currentCourseId}`)}`}
+                        target="_blank"
+                        rel="noreferrer referrer"
+                        className="text-[10px] font-mono font-bold text-indigo-600 hover:underline flex items-center gap-1"
+                      >
+                        Open Full Image
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 5-Star Quality Rating System */}
           <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200/60 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-8 animate-[fadeIn_0.4s_ease-out]">

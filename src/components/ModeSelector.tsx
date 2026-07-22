@@ -12,7 +12,9 @@ import {
   Film, 
   Video, 
   Gamepad2, 
-  Newspaper 
+  Newspaper,
+  Compass,
+  Layers
 } from "lucide-react";
 
 interface ModeSelectorProps {
@@ -32,6 +34,16 @@ interface ModeConfig {
 }
 
 const MODES: ModeConfig[] = [
+  {
+    id: "blueprint",
+    title: "Master Blueprint Studio",
+    badge: "35-Sec Blueprint",
+    description: "Investor & engineering-ready 35-section master company blueprint (Architecture, BOM, EVT/DVT/PVT, Financials, 10-Yr Roadmap, Risks).",
+    icon: Compass,
+    activeColor: "bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white border-amber-800 shadow-lg ring-2 ring-amber-400/30",
+    borderColor: "hover:border-amber-300 hover:bg-amber-50/40 border-slate-200 text-slate-700 bg-white",
+    textColor: "text-white"
+  },
   {
     id: "default",
     title: "Clarity Default",

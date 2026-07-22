@@ -1,5 +1,10 @@
-export type SimplificationMode = 'default' | 'eli5' | 'pro' | 'student' | 'academy' | 'ebook' | 'storybook' | 'webseries' | 'film' | 'animation' | 'game' | 'news' | 'business';
+export type SimplificationMode = 'default' | 'eli5' | 'pro' | 'student' | 'academy' | 'ebook' | 'storybook' | 'webseries' | 'film' | 'animation' | 'game' | 'news' | 'business' | 'blueprint';
 export type OutputLanguage = 'en' | 'hi' | 'hinglish';
+
+export interface WebSource {
+  uri: string;
+  title: string;
+}
 
 export interface InputHistoryItem {
   id: string;
@@ -13,6 +18,7 @@ export interface InputHistoryItem {
   title: string;
   timestamp: number;
   rating?: number;
+  sources?: WebSource[];
 }
 
 export interface ExampleItem {

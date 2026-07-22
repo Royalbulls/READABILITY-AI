@@ -1,8 +1,7 @@
 {
-  "name": "readability-ai",
-  "description": "Transform complex content into simple, human-friendly language",
+  "name": "react-example",
   "private": true,
-  "version": "2.5.0",
+  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",

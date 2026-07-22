@@ -46,8 +46,8 @@ interface ChatMessage {
 
 export default function CoursePage({ id, courseData, onBackToWorkspace }: CoursePageProps) {
   // URLs
-  const permanentUrl = `https://readability.rbaadvisor.com/course/${id}`;
-  const actualUrl = `${window.location.origin}/course/${id}`;
+  const permanentUrl = `https://readability.rbaadvisor.com/read/${id}`;
+  const actualUrl = `${window.location.origin}/read/${id}`;
 
   // UI States
   const [copied, setCopied] = useState(false);
